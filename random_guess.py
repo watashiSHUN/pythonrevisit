@@ -34,6 +34,24 @@ def computer_guess(x):
         else:
             end = mid-1
 
+# because => "b/c"
+def computer_guess2(x):
+    input(f"think of a random number between 1 and {x}, and computer will guess it: ") # does not store the input
+    start = 1
+    end = x
+    while start <= end:
+        # computer guess
+        guess = random.randint(start, end)
+        user_input = input(f"computer guessed {guess}, is it too [H], too [L] or correct [C]: ").lower()
+        if user_input == 'h':
+            end = guess-1
+        elif user_input == 'l':
+            start = guess+1
+        else:
+            break
+    # variable "guess" has function scope
+    print(f"yay, computer guessed {guess}")
 
 #guess(10)
-computer_guess(10)
+#computer_guess(10)
+computer_guess2(10)
