@@ -1,7 +1,7 @@
 import random
 
 class Player:
-    # O, X, #, three kinds
+    # O, X, #, any two letters, the game is played between 2
     def __init__(self, symbol):
         self.symbol = symbol
     # takes a game state, play the next move
@@ -18,6 +18,9 @@ class Player:
 # TODO, then why the inheritance
 # since we are calling parent constructor, we get parent member variable self.parent_field...
 class ComputerPlayer(Player):
+    def __init__(self,letter):
+        super().__init__(letter)
+
     def play(self, game): # override
         # randomly pick a spot to play
         # you can not index into a set, only array
@@ -30,11 +33,15 @@ class HumanPlayer(Player):
         # expect i,j
         while True:
             user_input = input("coordinate(expected: i,j): ")
-            i,j = user_input.split(',')
-            coord = (int(i),int(j))
-            if game.play(self.symbol, coord):
-                return
-            print("invalid input")
+            # surround user input in try_catch
+            try:
+                i,j = user_input.split(',')
+                coord = (int(i),int(j))
+                # could raise invalid error in the gameplay function
+                if game.play(self.symbol, coord):
+                    return
+            except:
+                print("invalid input")
 
 # store the games
 # easier to play, easier to tally
@@ -42,7 +49,7 @@ class HumanPlayer(Player):
 # empty set => easier for random computer to play
 class Game:
     def __init__(self):
-        self.board = [ ['_']*3 for i in range(3)]
+        self.board = [ [' ']*3 for i in range(3)]
         # used to play (pick a random point)
         # also used to calculate lines (set or list?)
         self.empty = set([(i,j) for i in range(3) for j in range(3)])
@@ -50,9 +57,10 @@ class Game:
         self.col =[{},{},{}]
         self.diagonal = [{},{}]
 
+    # first function to define
     def printBoard(self):
         for i in self.board:
-            print(" ".join(i))
+            print('|', " | ".join(i), '|')
     # return winner char
     # inconclusive return None
     def determineWinner(self):
@@ -89,29 +97,25 @@ class Game:
         else:
             return False
 
-# computer players
 def driver():
     # create two players
-    players = {'X': ComputerPlayer('X'), 'O': ComputerPlayer('O')}
-    # players = {'X': ComputerPlayer('X'), 'O': HumanPlayer('O')}
+    # players = {'X': ComputerPlayer('X'), 'O': ComputerPlayer('O')}
+    players = {'X': ComputerPlayer('X'), 'O': HumanPlayer('O')}
     # alternatively pass the game around players
     # at the end of each term, determine who have won
     game = Game()
-    game_round = 0
+    current_player = players['X']
     while game.spots(): # total of 9, 3*3 matrix
-        # select player
-        if game_round%2 == 0:
-            player = players['X']
-        else:
-            player = players['O']
-        game_round+=1
-        print("game round: ",game_round)
-        player.play(game)
+        current_player.play(game)
         game.printBoard()
+        # TODO check winner after each move
         winner = game.determineWinner()
         if winner is not None:
             print("winner is ", winner)
             return
+        # switch players
+        current_player = players['X'] if current_player == players['O'] else players['O']
+        print() #newline
     print("game is a draw")
 
 driver()
