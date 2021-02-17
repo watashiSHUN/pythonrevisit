@@ -12,6 +12,7 @@ class Player:
     # TODO, python doesn't need the template design pattern
     # dynamic type???
 
+# TODO how to test correctness
 # inheritance
 # computerplayer __init__(): player.__init__(self,....) => pass it to parent constructor, call it like class function
 # or call super().__init__(), no need self
@@ -33,12 +34,12 @@ class ComputerPlayer(Player):
 class SmartComputerPlayer(Player):
     def __init__(self, letter):
         super().__init__(letter)
-        self.map = {} # state: move, winner at the end if everyone plays optimally
+        self.map = {} # state: move, winner at the end if everyone plays optimally + how many empty spots left (fewer step is superior)
 
     # total steps 0-8
     def play(self, game):
         flat = game.getFlatBoard()
-        move, score = self.findBestMove(flat, self.symbol)
+        move, score, empties = self.findBestMove(flat, self.symbol)
         # cast move to i,j
         i = move // 3
         j = move % 3
@@ -46,77 +47,84 @@ class SmartComputerPlayer(Player):
 
     # assume mover will try its best
     # mover is the next to move
-    def findBestMove(self, game_state, mover_symbol):
+    # game_state has moves and lastmove
+    def findBestMove(self, game_state, mover_symbol, last_move=None):
         # base case
         if game_state in self.map:
             return self.map[game_state]
         # compute winner (game ends at this stage)
-        winner = SmartComputerPlayer.computeWinner(game_state)
+        # TODO, add mover_symbol for simpler computation
+        winner = SmartComputerPlayer.computeWinner(game_state, mover_symbol, last_move)
+        empty_spots = [i for i,v in enumerate(game_state) if v == ' ']
         result = None
         if winner is not None:
-            result = (None, winner)
+            result = (None, winner, len(empty_spots))
         else: # winner == None
-            empty_spots = [i for i,v in enumerate(game_state) if v == ' ']
             if not empty_spots: # draw
-                result = (None, None)
-            # TODO use game object
+                result = (None, None, len(empty_spots))
+            # TODO use game object ... this will have to copy the game object unless game object supports undo
             # try all the moves
             else:
                 next_symbol = 'X' if mover_symbol=='O' else 'O'
                 base = list(game_state[:])
                 for move in empty_spots:
-                    base[move] = mover_symbol
-                    next_move, winner = self.findBestMove(tuple(base),next_symbol)
+                    base[move] = mover_symbol # mover symbol, next symbol, different move
+                    next_move, winner, empties = self.findBestMove(tuple(base),next_symbol, move)
+                    # return winner of next move, we want the inverse
+                    # just played next move
                     base[move] = ' ' # reset for dfs
                     # cases where we need to update the optimal
                     if result is None:
-                        result = (move, winner)
-                    # win >= draw >= lose
-                    elif winner == mover_symbol:
-                        result = (move, winner)
-                    elif winner is None and result[1] == next_symbol:
-                        # update
-                        result = (move, winner)
-                    
+                        result = (move, winner, empties)
+                    # win >= tie >= lose
+                    # result has value already
+                    elif result[1] == next_symbol:
+                        # old result => I lost
+                        # tie/win + lose less
+                        if winner != next_symbol or empties < result[2]:
+                            result = (move, winner, empties)
+                    elif result[1] == mover_symbol:
+                        # old result => I won
+                        if winner == mover_symbol and empties > result[2]:
+                            result = (move, winner, empties)
+                    else:
+                        # old result = draw
+                        if winner == mover_symbol:
+                            result = (move, winner, empties)
         self.map[game_state] = result
-
-        # print('best move:', result, mover_symbol)
+        SmartComputerPlayer.printflat(game_state)
+        print('best move:', result, mover_symbol)
         return result
-                
-
-    # TODO, I don't want to call self
-    # do I need @staticmethod
-    @staticmethod
-    def helper(a,b):
-        return a if a == b and a != ' ' else None
 
     @staticmethod
     def printflat(game):
         for i in range(3):
             print(",".join(game[i*3:(i+1)*3]))
 
+    # only the last step can produce a winner
+    # otherwise the game has already finished => compute winner after each play
+    # test only the last step (index)
+    # which is why we compute winner after each play
+    # TODO winner(move, letter) -> evaluate if this move makes letter a winner 
     @staticmethod
-    def computeWinner(game_state):
-        # row
-        # [[0,1,2].[3,4,5],[6,7,8]]
-        for row in [game_state[i*3:(i+1)*3] for i in range(3)]:
-            result = reduce(SmartComputerPlayer.helper, row)
-            if result:
-                return result
-        # col
-        for col in [[game_state[i*3+j] for i in range(3)] for j in range(3)]:
-            result = reduce(SmartComputerPlayer.helper, col)
-            if result:
-                return result
+    def computeWinner(game_state, mover_symbol, last_move=None):
+        if last_move is None:
+            return None # no winner
+        row = last_move//3
+        if (game_state[row*3:(row+1)*3]).count(mover_symbol) == 3:
+            return mover_symbol
+        col = last_move%3
+        if [game_state[i*3+col] for i in range(3)].count(mover_symbol) == 3:
+            return mover_symbol
         # diagonal
         diagonal = [0,4,8]
-        inverse_diagona = [2,4,6]
-        result = reduce(SmartComputerPlayer.helper, [game_state[i] for i in diagonal])
-        if result:
-            return result
-        result = reduce(SmartComputerPlayer.helper, [game_state[i] for i in inverse_diagona])
-        if result:
-            return result
+        inverse_diagonal = [2,4,6]
+        if last_move in diagonal:
+            if [game_state[i] for i in diagonal].count(mover_symbol) == 3:
+                return mover_symbol
+        if last_move in inverse_diagonal:
+            if [game_state[i] for i in inverse_diagonal].count(mover_symbol) == 3:
+                return mover_symbol
         
 
 class HumanPlayer(Player):
@@ -131,9 +139,12 @@ class HumanPlayer(Player):
                 # could raise invalid error in the gameplay function
                 if game.play(self.symbol, coord):
                     return
-            except:
-                print("invalid input")
+                else:
+                    raise ValueError
+            except ValueError:
+                print("invalid input, Try again")
 
+# player be aware of the game, but the game doesn't need to know about players(passive)
 # store the games
 # easier to play, easier to tally
 # store in matrix => easier to print (currently use this, check all lines, if one symbol ==> winner)
@@ -193,12 +204,12 @@ class Game:
 
 def driver():
     # create two players
-    # players = {'X': ComputerPlayer('X'), 'O': ComputerPlayer('O')}
+    # players = {'X': SmartComputerPlayer('X'), 'O': SmartComputerPlayer('O')}
     players = {'X': SmartComputerPlayer('X'), 'O': HumanPlayer('O')}
     # alternatively pass the game around players
     # at the end of each term, determine who have won
     game = Game()
-    current_player = players['O']
+    current_player = players['X']
     while game.spots(): # total of 9, 3*3 matrix
         current_player.play(game)
         game.printBoard()
