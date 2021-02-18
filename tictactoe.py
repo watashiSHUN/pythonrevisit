@@ -45,55 +45,54 @@ class SmartComputerPlayer(Player):
         j = move % 3
         game.play(self.symbol, (i,j))
 
-    # assume mover will try its best
-    # mover is the next to move
-    # game_state has moves and lastmove
-    def findBestMove(self, game_state, mover_symbol, last_move=None):
-        # base case
+    # return best move for mover_symbol
+    # assume the game_state is not over yet
+    def findBestMove(self, game_state, mover_symbol):
+        # base case, computed before
         if game_state in self.map:
             return self.map[game_state]
-        # compute winner (game ends at this stage)
-        # TODO, add mover_symbol for simpler computation
-        winner = SmartComputerPlayer.computeWinner(game_state, mover_symbol, last_move)
-        empty_spots = [i for i,v in enumerate(game_state) if v == ' ']
         result = None
-        if winner is not None:
-            result = (None, winner, len(empty_spots))
-        else: # winner == None
-            if not empty_spots: # draw
-                result = (None, None, len(empty_spots))
-            # TODO use game object ... this will have to copy the game object unless game object supports undo
-            # try all the moves
+        # compute possible places to put mover_sybmol
+        empty_list = [i for i,v in enumerate(game_state) if v == ' ']
+        empties = len(empty_list)
+        next_state = list(game_state[:])
+        for e in empty_list:
+            # tentatively make a move
+            next_state[e] = mover_symbol
+            # compute if this is a winning move
+            winner = SmartComputerPlayer.computeWinner(next_state, mover_symbol, e)
+            if winner == mover_symbol or empties == 1:
+                self.map[game_state] = (e, winner, empties-1)
+                return self.map[game_state]
+            # if we won or draw, the game_state can not progress further
+            # the result can be used to return
+            # make one move we won => no result will perform better
+            # make one move we tie => only one move can be made
             else:
-                next_symbol = 'X' if mover_symbol=='O' else 'O'
-                base = list(game_state[:])
-                for move in empty_spots:
-                    base[move] = mover_symbol # mover symbol, next symbol, different move
-                    next_move, winner, empties = self.findBestMove(tuple(base),next_symbol, move)
-                    # return winner of next move, we want the inverse
-                    # just played next move
-                    base[move] = ' ' # reset for dfs
-                    # cases where we need to update the optimal
-                    if result is None:
-                        result = (move, winner, empties)
-                    # win >= tie >= lose
-                    # result has value already
-                    elif result[1] == next_symbol:
-                        # old result => I lost
-                        # tie/win + lose less
-                        if winner != next_symbol or empties < result[2]:
-                            result = (move, winner, empties)
-                    elif result[1] == mover_symbol:
-                        # old result => I won
-                        if winner == mover_symbol and empties > result[2]:
-                            result = (move, winner, empties)
-                    else:
-                        # old result = draw
-                        if winner == mover_symbol:
-                            result = (move, winner, empties)
+                # the game has not finished, let opponent play
+                opp_symbol = 'X' if mover_symbol == 'O' else 'O'
+                opp_move, opp_winner, opp_empties = self.findBestMove(tuple(next_state), opp_symbol)
+                if result is None:
+                    result = (e, opp_winner, opp_empties)
+                # result has value already
+                # old result => I lost
+                elif result[1] == opp_symbol:
+                    # tie/win or I still lost, but lost less
+                    if opp_winner != opp_symbol or empties-1 < result[2]:
+                        result = (e, opp_winner, opp_empties)
+                # old result => I won
+                elif result[1] == mover_symbol:
+                    # I won and with more empties
+                    if opp_winner == mover_symbol and empties-1 > result[2]:
+                        result = (e, opp_winner, opp_empties)
+                else:
+                    # old result = draw
+                    if opp_winner == mover_symbol:
+                        result = (e, opp_winner, opp_empties)
+            next_state[e] = ' ' # reset for dfs
         self.map[game_state] = result
-        SmartComputerPlayer.printflat(game_state)
-        print('best move:', result, mover_symbol)
+        # SmartComputerPlayer.printflat(game_state)
+        # print('best move:', result, mover_symbol)
         return result
 
     @staticmethod
@@ -107,9 +106,7 @@ class SmartComputerPlayer(Player):
     # which is why we compute winner after each play
     # TODO winner(move, letter) -> evaluate if this move makes letter a winner 
     @staticmethod
-    def computeWinner(game_state, mover_symbol, last_move=None):
-        if last_move is None:
-            return None # no winner
+    def computeWinner(game_state, mover_symbol, last_move):
         row = last_move//3
         if (game_state[row*3:(row+1)*3]).count(mover_symbol) == 3:
             return mover_symbol
@@ -204,8 +201,8 @@ class Game:
 
 def driver():
     # create two players
-    # players = {'X': SmartComputerPlayer('X'), 'O': SmartComputerPlayer('O')}
-    players = {'X': SmartComputerPlayer('X'), 'O': HumanPlayer('O')}
+    players = {'X': SmartComputerPlayer('X'), 'O': SmartComputerPlayer('O')}
+    # players = {'X': SmartComputerPlayer('X'), 'O': HumanPlayer('O')}
     # alternatively pass the game around players
     # at the end of each term, determine who have won
     game = Game()
