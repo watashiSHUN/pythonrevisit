@@ -4,10 +4,7 @@
 import random
 from enum import Enum
 
-class TileType(Enum):
-    SPACE = 1
-    NUMBER = 2
-    BOMB = 3
+TileType = Enum('TileType', 'SPACE NUMBER BOMB')
 
 class Tile:
     # operation: tile.type() or something similar
@@ -33,14 +30,20 @@ class Tile:
         else:
             return " "
 
-    # TODO dunder method
-    def increment(self):
-        if self.type is TileType.NUMBER:
-            self.num += 1
-        elif self.type is TileType.SPACE:
-            self.type = TileType.NUMBER
-            self.num += 1
-        # else do nothing, if its a bomb, we cannot update
+    # __add__, any number is allowed, need to check input type
+    # add semantically imply that the underlying number is unmodified
+    # += 1 makes more sense in this case, butx+=y => x = x+y or x = x.__iadd__(y)
+    # both __add__ and __iadd__ needs to return a value
+    # return self actually does not create a new object as opposed to add
+    # "rebinding"
+    def __iadd__(self, number):
+        # TODO check number type
+        if self.type is TileType.BOMB:
+            #noop
+            return self
+        self.type = TileType.NUMBER
+        self.num += number
+        return self
 
     def isBomb(self):
         return self.type is TileType.BOMB
@@ -74,7 +77,7 @@ class Game:
             r = i+r_adjust
             c = j+c_adjust
             if (0 <= r < self.dimension and 0 <= c < self.dimension):
-                self.matrix[r][c].increment()
+                self.matrix[r][c] += 1
 
     def convert(self, integer):
         # return (i,j)
