@@ -15,6 +15,8 @@ class Tile:
         self.discovered = False  # default should be false
         self.type = tile_type
         self.num = 0  # TODO wasted for the other 2 types
+        # by definition, 0/ space just means that there's zero bombs around it
+        # very consistent definition
 
     # tile could be a number (operation => ++)
     # tile could be a space  (operation, during setup, can change to number and space)
@@ -49,21 +51,31 @@ class Tile:
 
 # use bfs? as an exercises, to expand a minesweeper
 class Game:
-    def __init__(self, size):
-        self.undiscovered = size * size
+    # number of bombs control the difficulty
+    def __init__(self, size=5, num_bombs=2):
+        self.undiscovered = (
+            size ** 2
+        )  # squared instead of self.undiscovered*self.undiscovered
         self.dimension = size
-        self.bombs = size // 2
+        self.bombs = num_bombs
         # size*size
         self.matrix = []
-        for i in range(size):
+        # dummy init
+        # [[None for j in range(self.dimension)] for i in range(self.dimension)]
+        self.createNewBoard()
+
+    def createNewBoard(self):
+        # although not called repeatedly, separate it for better readability
+        for i in range(self.dimension):
             # add a row
             row = []
-            for j in range(size):
+            for j in range(self.dimension):
                 row.append(Tile(TileType.SPACE))
             self.matrix.append(row)
         # flatten the matrix, we can use index to specify which ones are mine
         # random.choices return result with sampling
-        bombs = random.sample([i for i in range(size * size)], self.bombs)
+        # TODO, figure out how this sampling is done
+        bombs = random.sample([i for i in range(self.undiscovered)], self.bombs)
 
         for b in bombs:
             i, j = self.convert(b)
@@ -72,13 +84,13 @@ class Game:
             self.updateSurroundings(i, j)
 
     def updateSurroundings(self, i, j):
-        # get the squares that is around (i,j)
-        const = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
-        for r_adjust, c_adjust in const:
-            r = i + r_adjust
-            c = j + c_adjust
-            if 0 <= r < self.dimension and 0 <= c < self.dimension:
-                self.matrix[r][c] += 1
+        # caveat: right end +2
+        # caveat: dont confuse the min max
+        for x in range(max(0, i - 1), min(i + 2, self.dimension)):
+            for y in range(max(0, j - 1), min(j + 2, self.dimension)):
+                if x == i and y == j:
+                    continue
+                self.matrix[x][y] += 1
 
     def convert(self, integer):
         # return (i,j)
@@ -104,22 +116,15 @@ class Game:
         tile_type = self.matrix[i][j].type
         self.revealPosition(i, j)
         # cannot reach any where from a number
+        # WHEN YOU REACHED A NUMBER, THEN IT IS NEXT TO A BOMB
         if tile_type is TileType.NUMBER:
             # end
             return
         # recurse, up/down/left/right
         # must be space
         assert tile_type is TileType.SPACE
-        for x, y in [
-            (-1, -1),
-            (-1, 0),
-            (-1, 1),
-            (0, -1),
-            (0, 1),
-            (1, -1),
-            (1, 0),
-            (1, 1),
-        ]:
+        const = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+        for x, y in const:
             self.expand(i + x, j + y)
 
     def revealPosition(self, i, j):
@@ -164,7 +169,8 @@ class Game:
 
 
 if __name__ == "__main__":
-    g = Game(5)
+    # create the game
+    g = Game()
     while True:
         g.print()
         try:
