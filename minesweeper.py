@@ -50,6 +50,7 @@ class Game:
     def __init__(self, size):
         self.undiscovered = size*size
         self.dimension = size
+        self.bombs = size // 2
         # size*size
         self.matrix = []
         for i in range(size):
@@ -60,7 +61,7 @@ class Game:
             self.matrix.append(row)
         # flatten the matrix, we can use index to specify which ones are mine
         # random.choices return result with sampling
-        bombs = random.sample([i for i in range(size*size)], size)
+        bombs = random.sample([i for i in range(size*size)], self.bombs)
 
         for b in bombs:
             i,j = self.convert(b)
@@ -107,7 +108,7 @@ class Game:
         # recurse, up/down/left/right
         # must be space
         assert(tile_type is TileType.SPACE)
-        for x,y in [(1,0),(-1,0),(0,1),(0,-1)]:
+        for x,y in [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]:
             self.expand(i+x,j+y)
 
     def revealPosition(self, i,j):
@@ -115,7 +116,7 @@ class Game:
         self.undiscovered -= 1
     
     def isUserWin(self):
-        self.undiscovered == self.dimension
+        return self.undiscovered == self.bombs
 
     def Play(self, i,j): # discover a tile
         # sanity check
@@ -154,12 +155,15 @@ if __name__ == "__main__":
     g = Game(5)
     while True:
         g.print()
-        i,j = [int(x) for x in input("pick a position to dig (i,j):").split(',')]
-        if g.Play(i,j):
-            g.reveal()
-            g.print()
-            break
-
+        try: 
+            i,j = [int(x) for x in input("pick a position to dig (i,j):").split(',')]
+            if g.Play(i,j):
+                g.reveal()
+                g.print()
+                break
+        except ValueError: # if we don't do this, it will catch interrupt, cannot exit from interpreter
+            #value error
+            print("invalid input")
 
 
 
