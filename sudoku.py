@@ -15,19 +15,21 @@ def findCube(row, col):
 
 
 def is_valid(puzzle, guess, row, col):
+    # DOWNSIDE, this doesn't break early
     # 3 things to check
     # row
     # x is the element
-    if sum([1 for x in puzzle[row] if x == guess]) > 0:
+    if guess in puzzle[row]:
         return False
     # col
     # x is the row index
-    if sum([1 for x in range(9) if puzzle[x][col] == guess]) > 0:
+    if guess in [puzzle[x][col] for x in range(9)]:
         return False
     # cube
-    for cube_row, cube_col in findCube(row, col):
-        if puzzle[cube_row][cube_col] == guess:
-            return False
+    if guess in [
+        puzzle[cube_row][cube_col] for cube_row, cube_col in findCube(row, col)
+    ]:
+        return False
 
     return True
 
