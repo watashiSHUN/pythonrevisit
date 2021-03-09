@@ -29,11 +29,12 @@ def findCube(index):
     return returnV
 
 
-# index is the index in puzzle
+# index to the missing[]
 def dfs(missing, index, puzzle):
     if index >= len(missing):
         # the end, we found a solution
         return True
+    # CAREFUL, index and missing[index] are pretty confusing
     row = missing[index] // 9
     col = missing[index] % 9
     # in current_position, try 1->9
@@ -50,7 +51,7 @@ def dfs(missing, index, puzzle):
             continue  # skip
         # cube
         flag = False
-        for cube in findCube(index):
+        for cube in findCube(missing[index]):
             cube_row = cube // 9
             cube_col = cube % 9
             if puzzle[cube_row][cube_col] == i:
