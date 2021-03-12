@@ -154,6 +154,8 @@ class SmartComputerPlayer(Player):
                 if score > result:
                     move = e
                     result = score
+                next_state[e] = " "
+            self.map[game_state] = (move, result)
             return (move, result)
         else:
             result = 200  # any result will be less than this
@@ -166,6 +168,8 @@ class SmartComputerPlayer(Player):
                 if score < result:
                     move = e
                     result = score
+                next_state[e] = " "
+            self.map[game_state] = (move, result)
             return (move, result)
 
     @staticmethod
