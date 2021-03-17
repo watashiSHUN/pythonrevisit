@@ -39,6 +39,7 @@ class ComputerPlayer(Player):
 class SmartComputerPlayer(Player):
     def __init__(self, letter):
         super().__init__(letter)
+        self.endstate = 0
         self.map = {}
         # key = state:
         # value =
@@ -51,6 +52,7 @@ class SmartComputerPlayer(Player):
         # move = self.findBestMove(flat, self.symbol)[0]
         # move = self.minimax(flat, self.symbol)[0]
         move = self.minimax_prune(flat, self.symbol, None, None)[0]
+        print(f"endstate: {self.endstate}")
         # cast move to i,j
         i = move // 3
         j = move % 3
@@ -129,19 +131,12 @@ class SmartComputerPlayer(Player):
         winner = SmartComputerPlayer.computeWinnerWithNoLast(game_state)
         empty_list = [i for i, v in enumerate(game_state) if v == " "]
         empties = len(empty_list)
+
         # return
-        if winner == self.symbol:
-            print("win")
-            SmartComputerPlayer.printflat(game_state)
-            return (None, 100 + empties)
-        elif winner is not None:
-            print("lose")
-            SmartComputerPlayer.printflat(game_state)
-            return (None, -(100 + empties))
-        elif empties == 0:
-            print("draw")
-            SmartComputerPlayer.printflat(game_state)
-            return (None, 0)  # draw
+        evaluate_result = self.endresult_helper(winner, empties, game_state)
+        if evaluate_result is not None:
+            return evaluate_result
+
         next_state = list(game_state[:])
         if is_max:
             # get the best outcome
@@ -173,6 +168,23 @@ class SmartComputerPlayer(Player):
             self.map[game_state] = (move, result)
             return (move, result)
 
+    def endresult_helper(self, winner, empties, game_state):
+        self.endstate += 1
+        if winner == self.symbol:
+            # print("win")
+            # SmartComputerPlayer.printflat(game_state)
+            return (None, 100 + empties)
+        elif winner is not None:
+            # print("lose")
+            # SmartComputerPlayer.printflat(game_state)
+            return (None, -(100 + empties))
+        elif empties == 0:
+            # print("draw")
+            # SmartComputerPlayer.printflat(game_state)
+            return (None, 0)  # draw
+        self.endstate -= 1
+        return None
+
     # alpha = parent is a maximizer, it's partial solution >= X (returned from sibling searches)
     # if current node, minimizer, (any evaluation) <= X, then we can skip the rest since parent will never pick current node
     #
@@ -185,19 +197,11 @@ class SmartComputerPlayer(Player):
         winner = SmartComputerPlayer.computeWinnerWithNoLast(game_state)
         empty_list = [i for i, v in enumerate(game_state) if v == " "]
         empties = len(empty_list)
-        # return
-        if winner == self.symbol:
-            print("win")
-            SmartComputerPlayer.printflat(game_state)
-            return (None, 100 + empties)
-        elif winner is not None:
-            print("lose")
-            SmartComputerPlayer.printflat(game_state)
-            return (None, -(100 + empties))
-        elif empties == 0:
-            print("draw")
-            SmartComputerPlayer.printflat(game_state)
-            return (None, 0)  # draw
+
+        evaluate_result = self.endresult_helper(winner, empties, game_state)
+        if evaluate_result is not None:
+            return evaluate_result
+
         next_state = list(game_state[:])
 
         result = None
@@ -208,6 +212,7 @@ class SmartComputerPlayer(Player):
                 # possible_moves
                 next_state[e] = self.symbol
                 # if we win, no point of keep playing (trim)
+                # FIXME pass alpha beta to grandchildren
                 min_best_move, score = self.minimax_prune(
                     tuple(next_state), False, result, None
                 )
