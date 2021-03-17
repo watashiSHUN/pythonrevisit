@@ -49,7 +49,8 @@ class SmartComputerPlayer(Player):
     def play(self, game):
         flat = game.getFlatBoard()
         # move = self.findBestMove(flat, self.symbol)[0]
-        move = self.minimax(flat, self.symbol)[0]
+        # move = self.minimax(flat, self.symbol)[0]
+        move = self.minimax_prune(flat, self.symbol, None, None)[0]
         # cast move to i,j
         i = move // 3
         j = move % 3
@@ -74,7 +75,7 @@ class SmartComputerPlayer(Player):
             next_state[e] = mover_symbol
             # compute if this is a winning move
             winner = SmartComputerPlayer.computeWinner(next_state, e)
-            if winner == mover_symbol or empties == 1:
+            if winner == mover_symbol or empties == 1:  # NOTE: this is pruning
                 self.map[game_state] = (e, winner, empties - 1)
                 return self.map[game_state]
             # if we won or draw, the game_state can not progress further
@@ -169,6 +170,78 @@ class SmartComputerPlayer(Player):
                     move = e
                     result = score
                 next_state[e] = " "
+            self.map[game_state] = (move, result)
+            return (move, result)
+
+    # alpha = parent is a maximizer, it's partial solution >= X (returned from sibling searches)
+    # if current node, minimizer, (any evaluation) <= X, then we can skip the rest since parent will never pick current node
+    #
+    # beta = parent is a minimizer, it's partial solution <= X
+    # current node, maximizer, (any solution >= X), then we can skip the rest since parent will never pick current node
+
+    def minimax_prune(self, game_state, is_max, alpha, beta):
+        if game_state in self.map:
+            return self.map[game_state]
+        winner = SmartComputerPlayer.computeWinnerWithNoLast(game_state)
+        empty_list = [i for i, v in enumerate(game_state) if v == " "]
+        empties = len(empty_list)
+        # return
+        if winner == self.symbol:
+            print("win")
+            SmartComputerPlayer.printflat(game_state)
+            return (None, 100 + empties)
+        elif winner is not None:
+            print("lose")
+            SmartComputerPlayer.printflat(game_state)
+            return (None, -(100 + empties))
+        elif empties == 0:
+            print("draw")
+            SmartComputerPlayer.printflat(game_state)
+            return (None, 0)  # draw
+        next_state = list(game_state[:])
+
+        result = None
+        move = 0
+        # read beta (parent is minimizer)
+        if is_max:
+            for e in empty_list:
+                # possible_moves
+                next_state[e] = self.symbol
+                # if we win, no point of keep playing (trim)
+                min_best_move, score = self.minimax_prune(
+                    tuple(next_state), False, result, None
+                )
+                if result is None or score > result:
+                    move = e
+                    result = score
+                next_state[e] = " "
+
+                # at least one result is retrieved from children
+                # alpha/beta pruning
+                # beta == None means I am the first child to be evaluated
+                if beta is not None and result >= beta:
+                    # Do not update the map, since solution from current state is incomplete
+                    return (move, result)  # NOTE: this result will not be used
+
+            self.map[game_state] = (move, result)
+            return (move, result)
+        # read alpha (parent is maximizer)
+        else:
+            opp_label = "X" if self.symbol == "O" else "O"
+            for e in empty_list:
+                next_state[e] = opp_label
+                # if opp doesn't take this, we can't trim, we will have to come back to it
+                max_best_move, score = self.minimax_prune(
+                    tuple(next_state), True, None, result
+                )
+                if result is None or score < result:
+                    move = e
+                    result = score
+                next_state[e] = " "
+
+                if alpha is not None and result <= alpha:
+                    return (move, result)
+
             self.map[game_state] = (move, result)
             return (move, result)
 
