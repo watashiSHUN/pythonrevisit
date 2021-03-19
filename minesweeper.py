@@ -177,3 +177,6 @@ if __name__ == "__main__":
         except ValueError:  # if we don't do this, it will catch interrupt, cannot exit from interpreter
             # value error
             print("invalid input")
+
+
+# TODO(minesweeper solver: https://www.geeksforgeeks.org/minesweeper-solver/?ref=leftbar-rightbar)
