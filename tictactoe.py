@@ -50,8 +50,8 @@ class SmartComputerPlayer(Player):
     def play(self, game):
         flat = game.getFlatBoard()
         # move = self.findBestMove(flat, self.symbol)[0]
-        # move = self.minimax(flat, self.symbol)[0]
-        move = self.minimax_prune(flat, self.symbol, None, None)[0]
+        move = self.minimax(flat, self.symbol)[0]
+        # move = self.minimax_prune(flat, self.symbol, None, None)[0]
         print(f"endstate: {self.endstate}")
         # cast move to i,j
         i = move // 3
@@ -185,7 +185,9 @@ class SmartComputerPlayer(Player):
         self.endstate -= 1
         return None
 
-    # alpha = parent is a maximizer, it's partial solution >= X (returned from sibling searches)
+    # alpha, closest maximizer >= alpha TODO all maximizer?
+    # beta, closest minimizer <= beta
+    # any parents who is a maximizer
     # if current node, minimizer, (any evaluation) <= X, then we can skip the rest since parent will never pick current node
     #
     # beta = parent is a minimizer, it's partial solution <= X
@@ -204,26 +206,29 @@ class SmartComputerPlayer(Player):
 
         next_state = list(game_state[:])
 
-        result = None
         move = 0
+        result = None
         # read beta (parent is minimizer)
         if is_max:
             for e in empty_list:
                 # possible_moves
                 next_state[e] = self.symbol
-                # if we win, no point of keep playing (trim)
-                # FIXME pass alpha beta to grandchildren
                 min_best_move, score = self.minimax_prune(
-                    tuple(next_state), False, result, None
+                    tuple(next_state), False, alpha, beta
                 )
                 if result is None or score > result:
-                    move = e
-                    result = score
+                    move, result = e, score
                 next_state[e] = " "
 
-                # at least one result is retrieved from children
-                # alpha/beta pruning
+                # update alpha (reduce range, only update when greater)
+                # at least one result is retrieved from children (after minimax_prune)
+                # current state will not update beta
+                if alpha is None or result > alpha:
+                    alpha = result
+
                 # beta == None means I am the first child to be evaluated
+                # if equals, then parent minimizer will just pick existing beta
+                # any furhter evaluation will get no better result
                 if beta is not None and result >= beta:
                     # Do not update the map, since solution from current state is incomplete
                     return (move, result)  # NOTE: this result will not be used
@@ -235,14 +240,15 @@ class SmartComputerPlayer(Player):
             opp_label = "X" if self.symbol == "O" else "O"
             for e in empty_list:
                 next_state[e] = opp_label
-                # if opp doesn't take this, we can't trim, we will have to come back to it
                 max_best_move, score = self.minimax_prune(
-                    tuple(next_state), True, None, result
+                    tuple(next_state), True, alpha, beta
                 )
                 if result is None or score < result:
-                    move = e
-                    result = score
+                    move, result = e, score
                 next_state[e] = " "
+
+                if beta is None or result < beta:
+                    beta = result
 
                 if alpha is not None and result <= alpha:
                     return (move, result)
