@@ -50,8 +50,8 @@ class SmartComputerPlayer(Player):
     def play(self, game):
         flat = game.getFlatBoard()
         # move = self.findBestMove(flat, self.symbol)[0]
-        move = self.minimax(flat, self.symbol)[0]
-        # move = self.minimax_prune(flat, self.symbol, None, None)[0]
+        # move = self.minimax(flat, self.symbol)[0]
+        move = self.minimax_prune(flat, self.symbol, None, None)[0]
         print(f"endstate: {self.endstate}")
         # cast move to i,j
         i = move // 3
@@ -185,14 +185,14 @@ class SmartComputerPlayer(Player):
         self.endstate -= 1
         return None
 
-    # alpha, closest maximizer >= alpha TODO all maximizer?
-    # beta, closest minimizer <= beta
-    # any parents who is a maximizer
-    # if current node, minimizer, (any evaluation) <= X, then we can skip the rest since parent will never pick current node
-    #
-    # beta = parent is a minimizer, it's partial solution <= X
-    # current node, maximizer, (any solution >= X), then we can skip the rest since parent will never pick current node
+    # alpha, maximizer can garantee at current level or above
+    # beta, best value minimizer can garantee at current level or above
+    # NOTE: this is so that we can trim more, alpha can also be any value that parent level or current is greater, but it will trim less
 
+    # at current level, we can boost alpha, so that any level below will have less nodes
+    # current maximizer has not finished evaluating, parent maximizer　>= X is irrelevant
+    # somewhere down the path, maximizer can play a move that gets better than minimizer
+    # if current maximizer has value < alpha...we need to keep evaluating, next one might be higher
     def minimax_prune(self, game_state, is_max, alpha, beta):
         if game_state in self.map:
             return self.map[game_state]
@@ -286,16 +286,15 @@ class SmartComputerPlayer(Player):
                 return mover_symbol
 
     def computeWinnerWithNoLast(game_state):
-        for row in range(3):
+        for var in range(3):
             if all(
-                [i == game_state[row * 3] for i in game_state[row * 3 : (row + 1) * 3]]
+                [i == game_state[var * 3] for i in game_state[var * 3 : (var + 1) * 3]]
             ):
-                if game_state[row * 3] != " ":
-                    return game_state[row * 3]
-        for col in range(3):
-            if all([game_state[col] == game_state[i * 3 + col] for i in range(3)]):
-                if game_state[col] != " ":
-                    return game_state[col]
+                if game_state[var * 3] != " ":
+                    return game_state[var * 3]
+            if all([game_state[var] == game_state[i * 3 + var] for i in range(3)]):
+                if game_state[var] != " ":
+                    return game_state[var]
         # diagonal
         diagonal = [0, 4, 8]
         inverse_diagonal = [2, 4, 6]
