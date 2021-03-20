@@ -40,6 +40,21 @@ def solve_n_queens(n):
         print(f"not possible for {n}")
 
 
+# add or remove constraints
+def update_diagonal(row, col, board, integer=1):
+    d_row, d_col, n = row, col, len(board)
+    while d_row < n and d_col < n:
+        board[d_row][d_col] += integer
+        d_row += 1
+        d_col += 1  # southeast
+    d_row, d_col = row, col
+    while d_row >= 0 and d_col < n:  # NOTE: col always += 1
+        board[d_row][d_col] += integer
+        d_row -= 1
+        d_col += 1  # northeast
+    # FIXME current position +=2 (should be alright)
+
+
 def dfs_constraint_propagation(solution, col, board):
     n = len(solution)
     if col >= n:  # previous cols queens do not attack each other
@@ -49,37 +64,18 @@ def dfs_constraint_propagation(solution, col, board):
         row = solution[i]
         if board[row][col] == 0:  # good to go
             # fill the rest of diagonals
-            d_row, d_col = row, col
-            while d_row < n and d_col < n:
-                board[d_row][d_col] += 1
-                d_row += 1
-                d_col += 1  # southeast
-            d_row, d_col = row, col
-            while d_row >= 0 and d_col < n:  # NOTE: col always += 1
-                board[d_row][d_col] += 1
-                d_row -= 1
-                d_col += 1  # northeast
-            # FIXME current position +=2 (should be alright)
+            update_diagonal(row, col, board)
             # swap
             solution[i], solution[col] = solution[col], solution[i]
             if dfs_constraint_propagation(solution, col + 1, board):
                 return True
             # failed
             # revert everything
+            update_diagonal(row, col, board, -1)
             solution[i], solution[col] = (
                 solution[col],
                 solution[i],
             )
-            d_row, d_col = row, col
-            while d_row < n and d_col < n:
-                board[d_row][d_col] -= 1
-                d_row += 1
-                d_col += 1
-            d_row, d_col = row, col
-            while d_row >= 0 and d_col < n:
-                board[d_row][d_col] -= 1
-                d_row -= 1
-                d_col += 1
     return False
 
 
