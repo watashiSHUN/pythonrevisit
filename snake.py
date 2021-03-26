@@ -4,6 +4,7 @@ from collections import deque
 from enum import Enum
 
 import pygame
+from pygame.math import Vector2
 
 pygame.init()
 
@@ -66,6 +67,11 @@ class Direction(Enum):
 
 # Assume only 1 snake in snake game
 class SnakeGame:
+    UP_VECTOR = Vector2(-1, 0)
+    DOWN_VECTOR = UP_VECTOR * -1
+    LEFT_VECTOR = Vector2(-1, 0)
+    RIGHT_VECTOR = LEFT_VECTOR * -1
+
     def __init__(self, game_width, game_height):
         # start from top left, going right
         self.direction = Direction.RIGHT  # up left down right
@@ -75,18 +81,20 @@ class SnakeGame:
         # left is tail, right is head, each entry is a tuple (x,y) coordinate in game grid
         # popleft(), append()
         # NOTE: we can obtain the length from this internal data structure, we don't need to store it
-        self.snake = deque([(0, 0)])
-        self.apple = (
-            random.randint(0, cell_width - 1),
-            random.randint(0, cell_width - 1),
-        )
+        # NOTE: vector2, 2d vectors a) access by .x .y not [0] [1] b) supports vector additions
+        self.snake = deque([Vector2(0, 0)])
 
+        # NOTE: I cannot initiate an apple here, it might bump to "apple"
+        self.apple = None
+        self.create_apple()
+
+    # return boolean, False = game over
     def move_snake(self, direction=None):
         # compute next step
         if direction is None or self.same_or_opposite_direction(direction):
             direction = self.direction
         # make a turn
-        next_step = self.next_step(direction, *self.snake[-1])
+        next_step = self.next_step(direction, self.snake[-1])
         # also update the direction
         self.direction = direction
         # return state
@@ -94,13 +102,13 @@ class SnakeGame:
         if next_step == self.apple:
             self.update_snake(next_step, increase_length=True)
             self.create_apple()  # FIXME called outside
-            return 1
+            return True
         # 2. hit a wall or your own body
-        if self.out_of_bound(*next_step) or next_step in self.snake:
-            return 2
+        if self.out_of_bound(next_step) or next_step in self.snake:
+            return False
         # 3. continue moving
         self.update_snake(next_step, increase_length=False)
-        return 3
+        return True
 
     def same_or_opposite_direction(self, direction):
         if (direction is Direction.UP or direction is Direction.DOWN) and (
@@ -113,20 +121,20 @@ class SnakeGame:
             return True
         return False
 
-    def next_step(self, direction, previous_x, previous_y):
+    def next_step(self, direction, previous_vector):
         if direction is Direction.UP:
-            return (previous_x - 1, previous_y)
+            return previous_vector + self.UP_VECTOR
         elif direction is Direction.DOWN:
-            return (previous_x + 1, previous_y)
+            return previous_vector + self.DOWN_VECTOR
         elif direction is Direction.LEFT:
-            return (previous_x, previous_y - 1)
+            return previous_vector + self.LEFT_VECTOR
         else:
-            return (previous_x, previous_y + 1)
+            return previous_vector + self.RIGHT_VECTOR
 
-    def out_of_bound(self, x, y):
-        if x < 0 or x >= self.game_width:
+    def out_of_bound(self, position):
+        if position.x < 0 or position.x >= self.game_width:
             return True
-        if y < 0 or y >= self.game_height:
+        if position.y < 0 or position.y >= self.game_height:
             return True
         return False
 
@@ -139,9 +147,9 @@ class SnakeGame:
         # called if move_snake takes the apple
         # random.randint(a,b) a<=x<=b
         while True:
-            next_apple = (
-                random.randint(0, cell_width - 1),
-                random.randint(0, cell_width - 1),
+            next_apple = Vector2(
+                random.randint(0, self.game_height - 1),
+                random.randint(0, self.game_width - 1),
             )
             if next_apple not in self.snake:
                 # set apple index
