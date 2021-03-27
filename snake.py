@@ -11,14 +11,6 @@ import pygame
 from pygame.math import Vector2
 
 
-# snake game, creates a grid on display (move 1 grid per frame)
-class Direction(Enum):
-    UP = 1
-    DOWN = 2
-    LEFT = 3
-    RIGHT = 4
-
-
 # Assume only 1 snake in snake game
 class SnakeGame:
     # NOTE: you can have different coordinates
@@ -32,7 +24,7 @@ class SnakeGame:
 
     def __init__(self, game_width, game_height, game_cell):
         # start from top left, going right
-        self.direction = Direction.RIGHT  # up left down right
+        self.direction = self.RIGHT_VECTOR  # up left down right
         # matrix width and height, when we draw, each grid is a cube
         self.game_width = game_width
         self.game_height = game_height
@@ -68,26 +60,12 @@ class SnakeGame:
             self.direction = direction  # make a turn
 
     def same_or_opposite_direction(self, direction):
-        if (direction is Direction.UP or direction is Direction.DOWN) and (
-            self.direction is Direction.UP or self.direction is Direction.DOWN
-        ):
-            return True
-        if (direction is Direction.LEFT or direction is Direction.RIGHT) and (
-            self.direction is Direction.LEFT or self.direction is Direction.RIGHT
-        ):
+        if direction == self.direction or direction == self.direction * -1:
             return True
         return False
 
     def next_step(self):
-        previous_vector = self.snake[-1]
-        if self.direction is Direction.UP:
-            return previous_vector + self.UP_VECTOR
-        elif self.direction is Direction.DOWN:
-            return previous_vector + self.DOWN_VECTOR
-        elif self.direction is Direction.LEFT:
-            return previous_vector + self.LEFT_VECTOR
-        else:
-            return previous_vector + self.RIGHT_VECTOR
+        return self.snake[-1] + self.direction
 
     def out_of_bound(self, position):
         if position.x < 0 or position.x >= self.game_width:
@@ -141,11 +119,11 @@ class SnakeGame:
 
 
 pygame.init()
-cell_size = 40
-cell_width = 20
+CELL_SIZE = 40
+CELL_WIDTH = 20
 # create a display surface, main game window
 # NOTE: canvas, there can only be one, display by default
-screen = pygame.display.set_mode(size=(cell_size * cell_width, cell_size * cell_width))
+screen = pygame.display.set_mode(size=(CELL_SIZE * CELL_WIDTH, CELL_SIZE * CELL_WIDTH))
 # it knows that it needs to create a window, but doesn't know how long it should keep it
 # so it creates it and then closes it
 clock = pygame.time.Clock()
@@ -162,9 +140,9 @@ x_position = 200
 SCREEN_UPDATE = pygame.USEREVENT
 # Create a timer event every 150milliseconds
 # put it in event queue
-pygame.time.set_timer(SCREEN_UPDATE, 500)
+pygame.time.set_timer(SCREEN_UPDATE, 300)
 
-s = SnakeGame(cell_width, cell_width, cell_size)
+s = SnakeGame(CELL_WIDTH, CELL_WIDTH, CELL_SIZE)
 # game loop
 while True:
     # event loop: 1, up down left right 2, close the window, clicking "X"
@@ -177,18 +155,21 @@ while True:
         if event.type == SCREEN_UPDATE:
             # 2. update the game state
             if not s.update_snake_apple():
+                # TODO print error message
                 pygame.quit()
                 sys.exit()
+        # whenever we press down any keys (might be missed?)
         if event.type == pygame.KEYDOWN:
             # 1. record the change direction as soon as we detect user input
+            # TODO, allow users to speed up
             if event.key == pygame.K_UP:
-                s.update_direction(Direction.UP)
-            elif event.key == pygame.K_DOWN:
-                s.update_direction(Direction.DOWN)
-            elif event.key == pygame.K_LEFT:
-                s.update_direction(Direction.LEFT)
-            elif event.key == pygame.K_RIGHT:
-                s.update_direction(Direction.RIGHT)
+                s.update_direction(SnakeGame.UP_VECTOR)
+            if event.key == pygame.K_DOWN:
+                s.update_direction(SnakeGame.DOWN_VECTOR)
+            if event.key == pygame.K_LEFT:
+                s.update_direction(SnakeGame.LEFT_VECTOR)
+            if event.key == pygame.K_RIGHT:
+                s.update_direction(SnakeGame.RIGHT_VECTOR)
             # change direction, but does not move the snake yet
 
     # color->RBG tuple (255[100% of red],255,255)
