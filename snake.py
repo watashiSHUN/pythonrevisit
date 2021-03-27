@@ -4,11 +4,14 @@ from collections import deque
 from enum import Enum
 
 import pygame
+
+# NOTE: check global table, if the module is already imported
+# get it instead of load it again, even if you rename it
+# both names are in the globals(). pygame + pygame.alias pointing to the same module
 from pygame.math import Vector2
 
 
 # snake game, creates a grid on display (move 1 grid per frame)
-# how to store snakes?
 class Direction(Enum):
     UP = 1
     DOWN = 2
@@ -18,7 +21,11 @@ class Direction(Enum):
 
 # Assume only 1 snake in snake game
 class SnakeGame:
-    UP_VECTOR = Vector2(-1, 0)
+    # NOTE: you can have different coordinates
+    # if using matrix, x is row, y is colon
+    # if using game graphics, x is x coordinate (horizontal) y is y coordinate (vertical)
+    # NOTE, we cannot use matrix coordinate, since when we draw, it expects graphics coordinate
+    UP_VECTOR = Vector2(0, -1)
     DOWN_VECTOR = UP_VECTOR * -1
     LEFT_VECTOR = Vector2(-1, 0)
     RIGHT_VECTOR = LEFT_VECTOR * -1
@@ -41,19 +48,13 @@ class SnakeGame:
         self.create_apple()
 
     # return boolean, False = game over
-    def move_snake(self, direction=None):
-        # compute next step
-        if direction is None or self.same_or_opposite_direction(direction):
-            direction = self.direction
-        # make a turn
-        next_step = self.next_step(direction, self.snake[-1])
-        # also update the direction
-        self.direction = direction
+    def update_snake_apple(self):
+        next_step = self.next_step()
         # return state
         # 1. increase length
         if next_step == self.apple:
             self.update_snake(next_step, increase_length=True)
-            self.create_apple()  # FIXME called outside
+            self.create_apple()
             return True
         # 2. hit a wall or your own body
         if self.out_of_bound(next_step) or next_step in self.snake:
@@ -61,6 +62,10 @@ class SnakeGame:
         # 3. continue moving
         self.update_snake(next_step, increase_length=False)
         return True
+
+    def update_direction(self, direction):
+        if not self.same_or_opposite_direction(direction):
+            self.direction = direction  # make a turn
 
     def same_or_opposite_direction(self, direction):
         if (direction is Direction.UP or direction is Direction.DOWN) and (
@@ -73,12 +78,13 @@ class SnakeGame:
             return True
         return False
 
-    def next_step(self, direction, previous_vector):
-        if direction is Direction.UP:
+    def next_step(self):
+        previous_vector = self.snake[-1]
+        if self.direction is Direction.UP:
             return previous_vector + self.UP_VECTOR
-        elif direction is Direction.DOWN:
+        elif self.direction is Direction.DOWN:
             return previous_vector + self.DOWN_VECTOR
-        elif direction is Direction.LEFT:
+        elif self.direction is Direction.LEFT:
             return previous_vector + self.LEFT_VECTOR
         else:
             return previous_vector + self.RIGHT_VECTOR
@@ -112,22 +118,24 @@ class SnakeGame:
         # draw the snake and the apple on to the canvas
         # rectangle
         # x, y(NOTE:coordinate of the topleft, NOT the center), width, height
+        # TODO make apple flash
         apple_rect = pygame.Rect(
             # NOTE: the actual pixel postion = cell_index * cell_width
             self.apple.x * self.game_cell,
             self.apple.y * self.game_cell,
-            self.game_cell,
-            self.game_cell,
+            self.game_cell - 1,
+            self.game_cell - 1,
         )
         # surface(screen), color, object
         pygame.draw.rect(surface, pygame.Color("Red"), apple_rect)
 
         for snake_body in self.snake:
             snake_rect = pygame.Rect(
+                # FIXME use variables to make this code more readable
                 snake_body.x * self.game_cell,
                 snake_body.y * self.game_cell,
-                self.game_cell,
-                self.game_cell,
+                self.game_cell - 1,
+                self.game_cell - 1,
             )
             pygame.draw.rect(surface, pygame.Color("Gold"), snake_rect)
 
@@ -149,6 +157,13 @@ test_surface = pygame.Surface(size=(100, 200))
 # TODO, surface.getrect()
 x_position = 200
 
+# user event
+# NOTE this controls the object speed, how often we move the snake
+SCREEN_UPDATE = pygame.USEREVENT
+# Create a timer event every 150milliseconds
+# put it in event queue
+pygame.time.set_timer(SCREEN_UPDATE, 500)
+
 s = SnakeGame(cell_width, cell_width, cell_size)
 # game loop
 while True:
@@ -158,23 +173,40 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()  # the opposite of pygame.init()
             sys.exit()
-    # draw all our elements
+        # add a timer event, for every interval, move snake
+        if event.type == SCREEN_UPDATE:
+            # 2. update the game state
+            if not s.update_snake_apple():
+                pygame.quit()
+                sys.exit()
+        if event.type == pygame.KEYDOWN:
+            # 1. record the change direction as soon as we detect user input
+            if event.key == pygame.K_UP:
+                s.update_direction(Direction.UP)
+            elif event.key == pygame.K_DOWN:
+                s.update_direction(Direction.DOWN)
+            elif event.key == pygame.K_LEFT:
+                s.update_direction(Direction.LEFT)
+            elif event.key == pygame.K_RIGHT:
+                s.update_direction(Direction.RIGHT)
+            # change direction, but does not move the snake yet
 
     # color->RBG tuple (255[100% of red],255,255)
     # screen.fill(pygame.Color("gold"))
     # NOTE: fill() is a method unique to screen
+    # NOTE: drawing order matters, always draw the bottom layer, the backdraw, otherwise it might override the others
     # rect color is specified in draw (rect object is just a shape)
-    screen.fill((175, 215, 70))
-    # TODO
-    # 1. take input
-    # 2. move snake accordingly
+
+    # TODO, if no update event, do we still want to draw?
     # 3. draw
+    screen.fill((175, 215, 70))
     s.draw(screen)
     pygame.display.update()
+
     # NOTE: run as many times as possible, depends on the computer
     # for fast computer, it can run a lot more times than a slow computer
     # each computer, we move the object for different amount because of this
-    clock.tick(60)  # 60 times in a sec
+    clock.tick(60)  # 60 frames per second
 
 
 # after each user move
