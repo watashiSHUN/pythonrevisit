@@ -1,7 +1,6 @@
 import random
 import sys
 from collections import deque
-from enum import Enum
 
 import pygame
 
@@ -25,54 +24,58 @@ class SnakeGame:
     def __init__(self, game_width, game_height, game_cell):
         # start from top left, going right
         self.direction = self.RIGHT_VECTOR  # up left down right
+        self.next_direction = self.direction  # by default
         # matrix width and height, when we draw, each grid is a cube
         self.game_width = game_width
         self.game_height = game_height
         self.game_cell = game_cell
+
         # left is tail, right is head, each entry is a tuple (x,y) coordinate in game grid
         # popleft(), append()
         # NOTE: we can obtain the length from this internal data structure, we don't need to store it
         # NOTE: vector2, 2d vectors a) access by .x .y not [0] [1] b) supports vector additions
-        self.snake = deque([Vector2(0, 0)])
+        # NOTE: righthand side is tail
+        # init size three, max length where you can't hurt yourself
+        self.snake = deque([Vector2(0, 0), Vector2(1, 0), Vector2(2, 0)])
 
         # NOTE: I cannot initiate an apple here, it might bump to "apple"
         self.apple = None
         self.create_apple()
 
     # return boolean, False = game over
-    def update_snake_apple(self):
+    def update_snake_apple_success(self):
         next_step = self.next_step()
         # return state
-        # 1. increase length
+        # 1. hit a wall or your own body
+        if not self.within_boundary(next_step) or next_step in self.snake:
+            return False
+        # 2. increase length
         if next_step == self.apple:
             self.update_snake(next_step, increase_length=True)
             self.create_apple()
-            return True
-        # 2. hit a wall or your own body
-        if self.out_of_bound(next_step) or next_step in self.snake:
-            return False
-        # 3. continue moving
-        self.update_snake(next_step, increase_length=False)
+        else:
+            # 3. continue moving
+            self.update_snake(next_step, increase_length=False)
+        # update the current direction after the move
+        self.direction = self.next_direction
         return True
 
+    # NOTE: this does not oupdate the current direction
+    # it stores next_direction, which will be considered in update_snake
     def update_direction(self, direction):
-        if not self.same_or_opposite_direction(direction):
-            self.direction = direction  # make a turn
+        if not self.opposite_direction(direction):
+            self.next_direction = direction
 
-    def same_or_opposite_direction(self, direction):
-        if direction == self.direction or direction == self.direction * -1:
+    def opposite_direction(self, direction):
+        if direction == self.direction * -1:
             return True
         return False
 
     def next_step(self):
-        return self.snake[-1] + self.direction
+        return self.snake[-1] + self.next_direction
 
-    def out_of_bound(self, position):
-        if position.x < 0 or position.x >= self.game_width:
-            return True
-        if position.y < 0 or position.y >= self.game_height:
-            return True
-        return False
+    def within_boundary(self, position):
+        return 0 <= position.x < self.game_width and 0 <= position.y < self.game_height
 
     def update_snake(self, next_step, increase_length=False):
         self.snake.append(next_step)
@@ -133,7 +136,6 @@ clock = pygame.time.Clock()
 test_surface = pygame.Surface(size=(100, 200))
 # TODO, diff between rect and surface
 # TODO, surface.getrect()
-x_position = 200
 
 # user event
 # NOTE this controls the object speed, how often we move the snake
@@ -154,12 +156,14 @@ while True:
         # add a timer event, for every interval, move snake
         if event.type == SCREEN_UPDATE:
             # 2. update the game state
-            if not s.update_snake_apple():
+            if not s.update_snake_apple_success():
                 # TODO print error message
                 pygame.quit()
                 sys.exit()
         # whenever we press down any keys (might be missed?)
         if event.type == pygame.KEYDOWN:
+            # TODO two directions registered, but we haven't draw yet, its possible to hit the snake body
+            # TODO add game pause
             # 1. record the change direction as soon as we detect user input
             # TODO, allow users to speed up
             if event.key == pygame.K_UP:
