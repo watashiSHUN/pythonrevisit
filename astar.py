@@ -1,15 +1,12 @@
+import sys
 from queue import PriorityQueue
 
 import pygame
 
 # capital letters for constants
-WIDH = 800
-WIN = pygame.display.set_mode((WIDH, WIDH))
-pygame.display.set_caption("A* Path Finding Algorithm")
-
-X_BOUND = 100
-Y_BOUND = 100
-WIDTH = 20
+X_BOUND = 50
+Y_BOUND = 40
+WIDTH = 15
 
 # put them in class becuase of the comparison
 # state and methods that operates on these states
@@ -24,6 +21,10 @@ class Node:
         self._state = 0  # 0 is not-visited, 1 is in-queue, 2 is visited, TODO use enum
         # NOTE we use this to prevent use of hash_set
         # TODO self._parent (in the shortest path)
+
+    # When the weight is equal, we will look for tie breaker
+    def __lt__(self, other):
+        return True
 
     # move the following out, first number in an array
     # def __lt__(self, other):
@@ -51,39 +52,43 @@ class Grid:
         self._x_bound = x_bound
         self._y_bound = y_bound
 
-        for y in range(y_bound):
+        for x in range(y_bound):
             row = []
-            for x in range(x_bound):
+            for y in range(x_bound):
                 row.append(Node(x, y))
             self._grid.append(row)
 
     def draw(self, window):
         # override everything in the canvas
-        window.fill(pygame.Color.WHITE)
+        # TODO draw lines on top
+        window.fill(pygame.Color("Black"))
 
-        for y in range(self._y_bound):
-            for x in range(self._x_bound):
+        for x in range(self._y_bound):
+            for y in range(self._x_bound):
                 node = self.get_node(x, y)
                 node_state = node._state
-                node_x = node._x * WIDTH
-                node_y = node._y * WIDTH
+                # key, node._x = x in matrix
+                # node_x is x in drawing (which is y)
+                node_x = node._y * WIDTH
+                node_y = node._x * WIDTH
                 if node_state == 0:
                     pygame.draw.rect(
                         window,
-                        pygame.Color.WHITE,
+                        pygame.Color("White"),
                         (node_x, node_y, WIDTH - 1, WIDTH - 1),
                     )
                 elif node_state == 1:
                     pygame.draw.rect(
-                        window, pygame.Color.RED, (node_x, node_y, WIDTH - 1, WIDTH - 1)
+                        window,
+                        pygame.Color("Red"),
+                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
                     )
                 elif node_state == 2:
                     pygame.draw.rect(
                         window,
-                        pygame.Color.YELLOW,
+                        pygame.Color("Yellow"),
                         (node_x, node_y, WIDTH - 1, WIDTH - 1),
                     )
-        # TODO draw lines on top
         pygame.display.update()
 
     def get_node(self, x, y):
@@ -97,11 +102,11 @@ class Grid:
         return_value = []
         if node._y > 0:
             return_value.append(self.get_node(node._x, node._y - 1))
-        if node._y < self._y_bound - 1:
+        if node._y < self._x_bound - 1:
             return_value.append(self.get_node(node._x, node._y + 1))
-        if node._x > 0:
+        if node._x > 0:  # moving up
             return_value.append(self.get_node(node._x - 1, node._y))
-        if node._x < self._x_bound - 1:
+        if node._x < self._y_bound - 1:
             return_value.append(self.get_node(node._x + 1, node._y))
         return return_value
 
@@ -134,7 +139,7 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
             # TODO reconstruct the path
             return next_node_g
         new_g = next_node_g + 1
-        for neighbor in grid.get_neighbor(next_node):
+        for neighbor in grid.get_neighbors(next_node):
             if neighbor._state == 2:
                 # do nothing
                 pass
@@ -152,3 +157,21 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
                 neighbor_h = h(neighbor)
                 neighbor._state = 1  # enqueue
                 priority_q.put((neighbor_h + new_g, new_g, neighbor_h, neighbor))
+
+        yield  # makes it a generator
+
+
+WIN = pygame.display.set_mode((X_BOUND * WIDTH, Y_BOUND * WIDTH))
+pygame.display.set_caption("A* Path Finding Algorithm")
+
+GRID = Grid(X_BOUND, Y_BOUND)
+generator = a_star(0, 0, Y_BOUND // 2, X_BOUND // 2, GRID)
+# game loop
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()  # the opposite of pygame.init()
+            sys.exit()
+    # draw
+    next(generator)
+    GRID.draw(WIN)
