@@ -18,13 +18,16 @@ class Node:
         self._y = y
 
         # TODO wrap it in a method, since the allowed values are a limited set
-        self._state = 0  # 0 is not-visited, 1 is in-queue, 2 is visited, TODO use enum
+        self._state = 0  # 0 is not-visited, 1 is in-queue, 2 is visited, 3 is part of the path TODO use enum
         # NOTE we use this to prevent use of hash_set
-        # TODO self._parent (in the shortest path)
+        self._parent = None
 
     # When the weight is equal, we will look for tie breaker
     def __lt__(self, other):
         return True
+
+    def set_parent(self, node):
+        self._parent = node
 
     # move the following out, first number in an array
     # def __lt__(self, other):
@@ -89,6 +92,12 @@ class Grid:
                         pygame.Color("Yellow"),
                         (node_x, node_y, WIDTH - 1, WIDTH - 1),
                     )
+                elif node_state == 3:
+                    pygame.draw.rect(
+                        window,
+                        pygame.Color("Green"),
+                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
+                    )
         pygame.display.update()
 
     def get_node(self, x, y):
@@ -111,6 +120,14 @@ class Grid:
         return return_value
 
 
+def construct_path(dest):
+    # backtrace to source
+    while dest is not None:
+        dest._state = 3
+        dest = dest._parent
+        yield False
+
+
 def a_star(src_x, src_y, dst_x, dst_y, grid):
     # manhattan distance
     def h(node):
@@ -123,21 +140,30 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
     # add a node into pq
     src_node = grid.get_node(src_x, src_y)
     src_g, src_h = 0, h(src_node)
-    priority_q.put((src_g + src_h, src_g, src_h, src_node))
+    # TODO make this tuple into a struct
+    # tuple:
+    # f
+    # g
+    # h
+    # node
+    # parent
+    priority_q.put((src_g + src_h, src_g, src_h, src_node, None))
     src_node._state = 1  # enqueue
 
     while not priority_q.empty():
-
-        _, next_node_g, next_node_h, next_node = priority_q.get()
+        _, next_node_g, next_node_h, next_node, parent = priority_q.get()
         # this would require us to separate the f and node
         if next_node._state == 2:
             # obsolete case
             continue
 
-        next_node._state = 2  # visited
+        # add it to visited node set
+        next_node._state = 2
+        next_node.set_parent(parent)
         if next_node._x == dst_x and next_node._y == dst_y:
-            # TODO reconstruct the path
-            return next_node_g
+            yield from construct_path(next_node)
+            break
+        # expand neighbors of next_node
         new_g = next_node_g + 1
         for neighbor in grid.get_neighbors(next_node):
             if neighbor._state == 2:
@@ -146,7 +172,9 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
             elif neighbor._state == 1:
                 # TODO we will not have neighbor._g
                 neighbor_h = h(neighbor)
-                priority_q.put((neighbor_h + new_g, new_g, neighbor_h, neighbor))
+                priority_q.put(
+                    (neighbor_h + new_g, new_g, neighbor_h, neighbor, next_node)
+                )
                 # instead update, we just insert,
                 # at pop, check if its visited (if so ignore)
                 # runing time will go up
@@ -156,22 +184,30 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
                 # NOTE all neighbor._g is the same, they are one cube away from current
                 neighbor_h = h(neighbor)
                 neighbor._state = 1  # enqueue
-                priority_q.put((neighbor_h + new_g, new_g, neighbor_h, neighbor))
+                priority_q.put(
+                    (neighbor_h + new_g, new_g, neighbor_h, neighbor, next_node)
+                )
 
-        yield  # makes it a generator
+        yield False  # makes it a generator
+    yield True
 
 
 WIN = pygame.display.set_mode((X_BOUND * WIDTH, Y_BOUND * WIDTH))
 pygame.display.set_caption("A* Path Finding Algorithm")
 
 GRID = Grid(X_BOUND, Y_BOUND)
-generator = a_star(0, 0, Y_BOUND // 2, X_BOUND // 2, GRID)
-# game loop
+generator = a_star(0, 0, Y_BOUND // 2, X_BOUND - 1, GRID)
+generator_finished = False
+# draw loop
 while True:
+    # TODO is this the best way to
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()  # the opposite of pygame.init()
             sys.exit()
-    # draw
-    next(generator)
+
+    # update and draw
+    if not generator_finished:
+        generator_finished = next(generator)
+
     GRID.draw(WIN)
