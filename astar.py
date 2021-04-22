@@ -1,4 +1,5 @@
 import sys
+from collections import namedtuple
 from queue import PriorityQueue
 
 import pygame
@@ -128,6 +129,11 @@ def construct_path(dest):
         yield False
 
 
+# TODO, does the name field matters for namedtuple?
+# we don't store the heurstics, it needs to be recalculated
+HeapEntry = namedtuple("HeapEntry", ["f", "g", "node", "parent"])
+
+
 def a_star(src_x, src_y, dst_x, dst_y, grid):
     # manhattan distance
     def h(node):
@@ -140,53 +146,34 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
     # add a node into pq
     src_node = grid.get_node(src_x, src_y)
     src_g, src_h = 0, h(src_node)
-    # TODO make this tuple into a struct
-    # tuple:
-    # f
-    # g
-    # h
-    # node
-    # parent
-    priority_q.put((src_g + src_h, src_g, src_h, src_node, None))
+    priority_q.put(HeapEntry(src_g + src_h, src_g, src_node, None))
     src_node._state = 1  # enqueue
 
     while not priority_q.empty():
-        _, next_node_g, next_node_h, next_node, parent = priority_q.get()
+        _, current_node_g, current_node, parent = priority_q.get()
         # this would require us to separate the f and node
-        if next_node._state == 2:
+        if current_node._state == 2:
             # obsolete case
             continue
 
         # add it to visited node set
-        next_node._state = 2
-        next_node.set_parent(parent)
-        if next_node._x == dst_x and next_node._y == dst_y:
-            yield from construct_path(next_node)
+        current_node._state = 2
+        current_node.set_parent(parent)
+        if current_node._x == dst_x and current_node._y == dst_y:
+            yield from construct_path(current_node)
             break
         # expand neighbors of next_node
-        new_g = next_node_g + 1
-        for neighbor in grid.get_neighbors(next_node):
+        new_g = current_node_g + 1
+        for neighbor in grid.get_neighbors(current_node):
             if neighbor._state == 2:
                 # do nothing
                 pass
-            elif neighbor._state == 1:
-                # TODO we will not have neighbor._g
+            else:
                 neighbor_h = h(neighbor)
-                priority_q.put(
-                    (neighbor_h + new_g, new_g, neighbor_h, neighbor, next_node)
-                )
-                # instead update, we just insert,
-                # at pop, check if its visited (if so ignore)
-                # runing time will go up
+                # whether it's in the queue or not we just add it
                 # TODO how to remove an object in the middle of the heap
-            else:  # neighbor is not visited
-                # set g and h
-                # NOTE all neighbor._g is the same, they are one cube away from current
-                neighbor_h = h(neighbor)
                 neighbor._state = 1  # enqueue
-                priority_q.put(
-                    (neighbor_h + new_g, new_g, neighbor_h, neighbor, next_node)
-                )
+                priority_q.put((neighbor_h + new_g, new_g, neighbor, current_node))
 
         yield False  # makes it a generator
     yield True
