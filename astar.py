@@ -27,6 +27,7 @@ class Node:
         # 3 is part of the path TODO use enum
         # 4 is src
         # 5 is dst
+        # 6 is obstacle
         self._parent = None
 
     # When the weight is equal, we will look for tie breaker
@@ -115,23 +116,28 @@ class Grid:
                         pygame.Color("Blue"),
                         (node_x, node_y, WIDTH - 1, WIDTH - 1),
                     )
+                elif node_state == 6:
+                    pygame.draw.rect(
+                        window,
+                        pygame.Color("Black"),
+                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
+                    )
         pygame.display.update()
 
     def get_node(self, x, y):
         return self._grid[x][y]
 
     def get_neighbors(self, node):
-        # TODO obstables
         # can only go UP,LEFT,RIGHT,DOWN
-        # TODO use pygame.vector2, supports math operations
-        if node._y > 0:
-            yield self.get_node(node._x, node._y - 1)
-        if node._y < self._x_bound - 1:
-            yield self.get_node(node._x, node._y + 1)
-        if node._x > 0:  # moving up
-            yield self.get_node(node._x - 1, node._y)
-        if node._x < self._y_bound - 1:
-            yield self.get_node(node._x + 1, node._y)
+        # TODO use pygame.vector2, support math operations
+        for x, y in [(0, 1), (1, 0), (-1, 0), (0, -1)]:
+            # make sure it's within range
+            neighborx = node._x + x
+            neighbory = node._y + y
+            if 0 <= neighborx < self._y_bound and 0 <= neighbory < self._x_bound:
+                neighbor_node = self.get_node(neighborx, neighbory)
+                if neighbor_node._state != 6:
+                    yield neighbor_node
 
 
 def get_node_from_position(position, grid):
@@ -205,9 +211,9 @@ state_machine = 0
 src = None
 # 1 pick dst
 dst = None
-# 2 start a*
+# 2 pick obstacles
+# 3 start a*
 generator = None
-# 3 no input, just draw
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -216,20 +222,23 @@ while True:
         # NOTE [0] is left mouse button, [1] is middle, [2] is right
         # cannot be if if if, need if elif otherwise every executes in one go
         if pygame.mouse.get_pressed()[0]:
+            pos = pygame.mouse.get_pos()
+            node = get_node_from_position(pos, GRID)
             if state_machine == 0:
-                pos = pygame.mouse.get_pos()
-                src = get_node_from_position(pos, GRID)
+                src = node
                 src._state = 4
                 state_machine = 1
             elif state_machine == 1:
-                pos = pygame.mouse.get_pos()
-                dst = get_node_from_position(pos, GRID)
+                dst = node
                 dst._state = 5
                 state_machine = 2
             elif state_machine == 2:
-                generator = a_star(src, dst, GRID)
-                generator_finished = False
-                state_machine = 3
+                node._state = 6
+                # does not update state_machine
+        if state_machine == 2 and pygame.key.get_pressed()[pygame.K_SPACE]:
+            generator = a_star(src, dst, GRID)
+            generator_finished = False
+            state_machine = 3
 
     if generator and not generator_finished:
         generator_finished = next(generator)
