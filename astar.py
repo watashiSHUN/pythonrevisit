@@ -19,31 +19,35 @@ class Node:
         self._y = y
 
         # TODO wrap it in a method, since the allowed values are a limited set
-        self._state = 0  # 0 is not-visited, 1 is in-queue, 2 is visited, 3 is part of the path TODO use enum
-        # NOTE we use this to prevent use of hash_set
+        # TODO add new color, change 2 places, state and draw...
+        self._state = 0
+        # 0 is not-visited,
+        # 1 is in-queue,
+        # 2 is visited,
+        # 3 is part of the path TODO use enum
+        # 4 is src
+        # 5 is dst
         self._parent = None
 
     # When the weight is equal, we will look for tie breaker
     def __lt__(self, other):
         return True
 
+    # TODO should parent be a property of node?
     def set_parent(self, node):
         self._parent = node
 
-    # move the following out, first number in an array
-    # def __lt__(self, other):
-    #     if type(self) is type(other):
-    #         return (self._g + self._h) < (other._g + other._h)
-    #     return False
+    def manhattan_distance(self, node):
+        return abs(self._x - node._x) + abs(self._y - node._y)
 
     # __eq__ and __hash__ for hashset, check if they've already been evaluated
     # NOTE in python 3, eq ==> !ne, implied relationship
-    # def __eq__(self, other):
-    #     # isinstance will cover inheritance ==> father == children
-    #     # but children != father (not implemented)
-    #     if type(other) is type(self):
-    #         return self._x == other._x and self._y == other._y
-    #     return False
+    def __eq__(self, other):
+        # isinstance will cover inheritance ==> father == children
+        # but children != father (not implemented)
+        if type(other) is type(self):
+            return self._x == other._x and self._y == other._y
+        return False
 
     # def __hash__(self):
     #     return hash((self._x, self._y))
@@ -99,6 +103,18 @@ class Grid:
                         pygame.Color("Green"),
                         (node_x, node_y, WIDTH - 1, WIDTH - 1),
                     )
+                elif node_state == 4:
+                    pygame.draw.rect(
+                        window,
+                        pygame.Color("Gold"),
+                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
+                    )
+                elif node_state == 5:
+                    pygame.draw.rect(
+                        window,
+                        pygame.Color("Blue"),
+                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
+                    )
         pygame.display.update()
 
     def get_node(self, x, y):
@@ -108,17 +124,21 @@ class Grid:
         # TODO obstables
         # can only go UP,LEFT,RIGHT,DOWN
         # TODO use pygame.vector2, supports math operations
-        # TODO return a generator
-        return_value = []
         if node._y > 0:
-            return_value.append(self.get_node(node._x, node._y - 1))
+            yield self.get_node(node._x, node._y - 1)
         if node._y < self._x_bound - 1:
-            return_value.append(self.get_node(node._x, node._y + 1))
+            yield self.get_node(node._x, node._y + 1)
         if node._x > 0:  # moving up
-            return_value.append(self.get_node(node._x - 1, node._y))
+            yield self.get_node(node._x - 1, node._y)
         if node._x < self._y_bound - 1:
-            return_value.append(self.get_node(node._x + 1, node._y))
-        return return_value
+            yield self.get_node(node._x + 1, node._y)
+
+
+def get_node_from_position(position, grid):
+    x, y = position
+    x_coordinate = y // WIDTH
+    y_coordinate = x // WIDTH
+    return grid.get_node(x_coordinate, y_coordinate)
 
 
 def construct_path(dest):
@@ -129,23 +149,17 @@ def construct_path(dest):
         yield False
 
 
-# TODO, does the name field matters for namedtuple?
+# TODO, does the name field(1st argument) matter for namedtuple?
 # we don't store the heurstics, it needs to be recalculated
 HeapEntry = namedtuple("HeapEntry", ["f", "g", "node", "parent"])
 
 
-def a_star(src_x, src_y, dst_x, dst_y, grid):
-    # manhattan distance
-    def h(node):
-        return abs(node._x - dst_x) + abs(node._y - dst_y)
-
+def a_star(src_node, dst_node, grid):
     # stops when destination is reached
     # priorityqueue doesn't support decrease key...so I think it should be the same as heapq
     # prorityqueue shares queue interface, put+get()
     priority_q = PriorityQueue()
-    # add a node into pq
-    src_node = grid.get_node(src_x, src_y)
-    src_g, src_h = 0, h(src_node)
+    src_g, src_h = 0, src_node.manhattan_distance(dst_node)
     priority_q.put(HeapEntry(src_g + src_h, src_g, src_node, None))
     src_node._state = 1  # enqueue
 
@@ -159,7 +173,7 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
         # add it to visited node set
         current_node._state = 2
         current_node.set_parent(parent)
-        if current_node._x == dst_x and current_node._y == dst_y:
+        if current_node == dst_node:
             yield from construct_path(current_node)
             break
         # expand neighbors of next_node
@@ -169,7 +183,7 @@ def a_star(src_x, src_y, dst_x, dst_y, grid):
                 # do nothing
                 pass
             else:
-                neighbor_h = h(neighbor)
+                neighbor_h = neighbor.manhattan_distance(dst_node)
                 # whether it's in the queue or not we just add it
                 # TODO how to remove an object in the middle of the heap
                 neighbor._state = 1  # enqueue
@@ -183,18 +197,41 @@ WIN = pygame.display.set_mode((X_BOUND * WIDTH, Y_BOUND * WIDTH))
 pygame.display.set_caption("A* Path Finding Algorithm")
 
 GRID = Grid(X_BOUND, Y_BOUND)
-generator = a_star(0, 0, Y_BOUND // 2, X_BOUND - 1, GRID)
-generator_finished = False
+
 # draw loop
+# different states
+state_machine = 0
+# 0 pick src
+src = None
+# 1 pick dst
+dst = None
+# 2 start a*
+generator = None
+# 3 no input, just draw
 while True:
-    # TODO is this the best way to
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()  # the opposite of pygame.init()
             sys.exit()
+        # NOTE [0] is left mouse button, [1] is middle, [2] is right
+        # cannot be if if if, need if elif otherwise every executes in one go
+        if pygame.mouse.get_pressed()[0]:
+            if state_machine == 0:
+                pos = pygame.mouse.get_pos()
+                src = get_node_from_position(pos, GRID)
+                src._state = 4
+                state_machine = 1
+            elif state_machine == 1:
+                pos = pygame.mouse.get_pos()
+                dst = get_node_from_position(pos, GRID)
+                dst._state = 5
+                state_machine = 2
+            elif state_machine == 2:
+                generator = a_star(src, dst, GRID)
+                generator_finished = False
+                state_machine = 3
 
-    # update and draw
-    if not generator_finished:
+    if generator and not generator_finished:
         generator_finished = next(generator)
 
     GRID.draw(WIN)
