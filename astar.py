@@ -9,6 +9,15 @@ X_BOUND = 50
 Y_BOUND = 40
 WIDTH = 15
 
+
+# 0 not-visited,
+# 1 in-queue,
+# 2 visited,
+# 3 part of the path
+# 4 src
+# 5 dst
+# 6 obstacle
+STATE_COLOR = ["White", "Red", "Yellow", "Green", "Gold", "Blue", "Black"]
 # put them in class becuase of the comparison
 # state and methods that operates on these states
 class Node:
@@ -20,21 +29,15 @@ class Node:
 
         # TODO wrap it in a method, since the allowed values are a limited set
         # TODO add new color, change 2 places, state and draw...
+        # NOTE, _state and _parent would require a map to be indexed if not set here
+        # TODO use enum
         self._state = 0
-        # 0 is not-visited,
-        # 1 is in-queue,
-        # 2 is visited,
-        # 3 is part of the path TODO use enum
-        # 4 is src
-        # 5 is dst
-        # 6 is obstacle
         self._parent = None
 
     # When the weight is equal, we will look for tie breaker
     def __lt__(self, other):
         return True
 
-    # TODO should parent be a property of node?
     def set_parent(self, node):
         self._parent = node
 
@@ -80,53 +83,17 @@ class Grid:
                 # node_x is x in drawing (which is y)
                 node_x = node._y * WIDTH
                 node_y = node._x * WIDTH
-                if node_state == 0:
-                    pygame.draw.rect(
-                        window,
-                        pygame.Color("White"),
-                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
-                    )
-                elif node_state == 1:
-                    pygame.draw.rect(
-                        window,
-                        pygame.Color("Red"),
-                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
-                    )
-                elif node_state == 2:
-                    pygame.draw.rect(
-                        window,
-                        pygame.Color("Yellow"),
-                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
-                    )
-                elif node_state == 3:
-                    pygame.draw.rect(
-                        window,
-                        pygame.Color("Green"),
-                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
-                    )
-                elif node_state == 4:
-                    pygame.draw.rect(
-                        window,
-                        pygame.Color("Gold"),
-                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
-                    )
-                elif node_state == 5:
-                    pygame.draw.rect(
-                        window,
-                        pygame.Color("Blue"),
-                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
-                    )
-                elif node_state == 6:
-                    pygame.draw.rect(
-                        window,
-                        pygame.Color("Black"),
-                        (node_x, node_y, WIDTH - 1, WIDTH - 1),
-                    )
+                pygame.draw.rect(
+                    window,
+                    pygame.Color(STATE_COLOR[node_state]),
+                    (node_x, node_y, WIDTH - 1, WIDTH - 1),
+                )
         pygame.display.update()
 
     def get_node(self, x, y):
         return self._grid[x][y]
 
+    # implicit adj list, we don't store the edges as its a waste of space
     def get_neighbors(self, node):
         # can only go UP,LEFT,RIGHT,DOWN
         # TODO use pygame.vector2, support math operations
@@ -166,6 +133,7 @@ def a_star(src_node, dst_node, grid):
     # prorityqueue shares queue interface, put+get()
     priority_q = PriorityQueue()
     src_g, src_h = 0, src_node.manhattan_distance(dst_node)
+    # src_node.parent is None
     priority_q.put(HeapEntry(src_g + src_h, src_g, src_node, None))
     src_node._state = 1  # enqueue
 
@@ -180,6 +148,7 @@ def a_star(src_node, dst_node, grid):
         current_node._state = 2
         current_node.set_parent(parent)
         if current_node == dst_node:
+            # TODO same as yield next()?
             yield from construct_path(current_node)
             break
         # expand neighbors of next_node
