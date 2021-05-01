@@ -30,7 +30,7 @@ class Node:
         # TODO wrap it in a method, since the allowed values are a limited set
         # TODO add new color, change 2 places, state and draw...
         # NOTE, _state and _parent would require a map to be indexed if not set here
-        # TODO use enum
+        # TODO use enum, each value needs a property (color)
         self._state = 0
         self._parent = None
 
@@ -198,10 +198,15 @@ while True:
                 src._state = 4
                 state_machine = 1
             elif state_machine == 1:
+                # src node is already defined, cannot override it
+                if node == src:
+                    continue
                 dst = node
                 dst._state = 5
                 state_machine = 2
             elif state_machine == 2:
+                if node == src or node == dst:
+                    continue
                 node._state = 6
                 # does not update state_machine
         if state_machine == 2 and pygame.key.get_pressed()[pygame.K_SPACE]:
@@ -213,3 +218,5 @@ while True:
         generator_finished = next(generator)
 
     GRID.draw(WIN)
+
+# TODO check when its not reachable
