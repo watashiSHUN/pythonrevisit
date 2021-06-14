@@ -8,42 +8,68 @@ class Ball:
     def __init__(self, width, color, coordinate, initial_movement):
         self.width = width
         self.color = color
-        self.x, self.y = coordinate
+        # one single ball object, mutable
+        self.ball = pygame.Rect(coordinate[0], coordinate[1], self.width, self.width)
         # use vector to denote speed and direction
         self.vector_x, self.vector_y = initial_movement
 
     def draw(self, surface):
-        # create rectangle to draw
-        print(self.x, self.y)
-        rect = pygame.Rect(self.x, self.y, self.width, self.width)
-        pygame.draw.ellipse(surface, self.color, rect)
+        pygame.draw.ellipse(surface, self.color, self.ball)
 
     # TODO, if we want to manage the barriers in Ball class
-    def update_Position(self, screen_width, screen_height):
+    def update_position(self, screen_width, screen_height):
         screen_width = screen_width - self.width
         screen_height = screen_height - self.width
 
-        new_x = self.x + self.vector_x
-        new_y = self.y + self.vector_y
+        new_x = self.ball.x + self.vector_x
+        new_y = self.ball.y + self.vector_y
         # if fractional, part of the ball follows the old trajectory
         # the rest follows the new trajectory
-        if new_x < 0:
-            self.x = -new_x
-            self.vector_x = -self.vector_x
-        elif new_x > screen_width:
-            self.x = screen_width - (new_x - screen_width)
-            self.vector_x = -self.vector_x
+        # comment out so that left player can fight against the wall
+        # if new_x < 0:
+        #     self.ball.x = -new_x
+        #     self.vector_x *= -1
+        if new_x > screen_width:
+            self.ball.x = screen_width - (new_x - screen_width)
+            self.vector_x *= -1
         else:
-            self.x = new_x
+            self.ball.x = new_x
 
         if new_y < 0:
-            self.y = -new_y
-            self.vector_y = -self.vector_y
+            self.ball.y = -new_y
+            self.vector_y *= -1
         elif new_y > screen_height:
-            self.y = screen_height - (new_y - screen_height)
-            self.vector_y = -self.vector_y
+            self.ball.y = screen_height - (new_y - screen_height)
+            self.vector_y *= -1
         else:
-            self.y = new_y
+            self.ball.y = new_y
+
+    # if we collide with players, we change trajectory
+    def hit_players(self, left_player, right_player):
+        if self.ball.colliderect(left_player) or self.ball.colliderect(right_player):
+            self.vector_x *= -1
+
+
+# TODO add a game class
+
+
+class Player:
+    def __init__(self, coordinate, speed, width, height, color):
+        self.width = width
+        self.color = color
+        self.height = height
+        self.speed = speed  # how much the controller can move the ball
+        self.player = pygame.Rect(coordinate[0], coordinate[1], width, height)
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, self.color, self.player)
+
+    # TODO put a rectangle over the drawing surface
+    def update_position(self, key, height):
+        if key == pygame.K_UP and self.player.top > 0:
+            self.player.top = max(self.player.top - self.speed, 0)
+        elif key == pygame.K_DOWN and self.player.bottom < height:
+            self.player.bottom = min(height, self.player.bottom + self.speed)
 
 
 # setup
@@ -65,20 +91,25 @@ ball = Ball(
     BALL_WIDTH,
     LIGHT_GREY,
     ((SCREEN_WIDTH - BALL_WIDTH) // 2, (SCREEN_HEIGHT - BALL_WIDTH) // 2),
-    (20, 10),
+    (10, 5),
 )
 
 # (x,y,w,h)
 PLAYER_WIDTH = 10
 PLAYER_HEIGHT = 150
+PLAYER_SPEED = 5
 # different concept, rect, rect can be put around shape and surfaces
 # like a selector in photoshop
-player = pygame.Rect(0, 0, PLAYER_WIDTH, PLAYER_HEIGHT)
-opponent = pygame.Rect(
-    SCREEN_WIDTH - PLAYER_WIDTH,
-    SCREEN_HEIGHT - PLAYER_HEIGHT,
+player = Player((0, 0), PLAYER_SPEED, PLAYER_WIDTH, PLAYER_HEIGHT, LIGHT_GREY)
+opponent = Player(
+    (
+        SCREEN_WIDTH - PLAYER_WIDTH,
+        SCREEN_HEIGHT - PLAYER_HEIGHT,
+    ),
+    PLAYER_SPEED,
     PLAYER_WIDTH,
     PLAYER_HEIGHT,
+    LIGHT_GREY,
 )
 
 # game loop
@@ -93,6 +124,15 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+            # TODO, does not handle key press + key release
+            # if event.type == pygame.KEYDOWN:
+    # holding key does not trigger an event
+    keys = pygame.key.get_pressed()
+    # all the key BEING pressed
+    if keys[pygame.K_UP]:
+        player.update_position(pygame.K_UP, SCREEN_HEIGHT)
+    elif keys[pygame.K_DOWN]:
+        player.update_position(pygame.K_DOWN, SCREEN_HEIGHT)
 
     # main display surface, only a single one
     # pygame.draw ==> directly on display
@@ -106,10 +146,12 @@ while True:
     SCREEN.fill(BACKGROUND)
     # NOTE: pygame.draw draw directly on the display
     # NOTE: draw takes a surface, color, rectangle
-    pygame.draw.rect(SCREEN, LIGHT_GREY, player)
-    pygame.draw.rect(SCREEN, LIGHT_GREY, opponent)
-    ball.update_Position(SCREEN_WIDTH, SCREEN_HEIGHT)
+    player.draw(SCREEN)
+    opponent.draw(SCREEN)
+    ball.update_position(SCREEN_WIDTH, SCREEN_HEIGHT)
+    ball.hit_players(player.player, opponent.player)
     ball.draw(SCREEN)
+    # TODO check for collision, rect1.colliderect(rect2)
     pygame.draw.line(
         SCREEN,
         LIGHT_GREY,
