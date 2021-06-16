@@ -1,28 +1,41 @@
 # used to close the program
+import math
+import random
 import sys
 
 import pygame
 
 
-class Ball:
-    def __init__(self, width, color, coordinate, initial_movement):
-        self.width = width
+# TODO add a game class
+class DrawableRect:
+    def __init__(self, coordinate, width, height, color):
         self.color = color
-        # one single ball object, mutable
-        self.rect = pygame.Rect(coordinate[0], coordinate[1], self.width, self.width)
-        # use vector to denote speed and direction
-        self.vector_x, self.vector_y = initial_movement
+        self.rect = pygame.Rect(coordinate[0], coordinate[1], width, height)
 
     def draw(self, surface):
-        pygame.draw.ellipse(surface, self.color, self.rect)
+        pygame.draw.rect(surface, self.color, self.rect)
 
     def get_rect(self):
         return self.rect
 
-    # TODO, if we want to manage the barriers in Ball class
-    def update_position(self, screen_width, screen_height):
-        screen_width = screen_width - self.width
-        screen_height = screen_height - self.width
+
+# TODO, don't create object with object dependeny (creation order can be independent)
+# pass it to update_position
+class Ball(DrawableRect):
+    def __init__(self, width, color, coordinate, initial_movement):
+        super().__init__(coordinate, width, width, color)
+        self.init_coordinate = coordinate
+        # use vector to denote speed and direction
+        self.vector_x, self.vector_y = initial_movement
+        self.speed = math.sqrt((self.vector_x) ** 2 + (self.vector_y) ** 2)
+
+    # draw ellipse instead of rect
+    def draw(self, surface):
+        pygame.draw.ellipse(surface, self.color, self.rect)
+
+    def update_position(self, surface):
+        screen_width = surface.get_width() - self.rect.width
+        screen_height = surface.get_height() - self.rect.width
 
         self.rect.x += self.vector_x
         new_y = self.rect.y + self.vector_y
@@ -44,25 +57,25 @@ class Ball:
         if self.rect.colliderect(left_player) or self.rect.colliderect(right_player):
             self.vector_x *= -1
 
+    def gg(self, surface):
+        if not surface.get_rect().contains(self.rect):
+            # reset the ball
+            self.rect.x = self.init_coordinate[0]
+            self.rect.y = self.init_coordinate[1]
+            # random trajectory
+            # TODO display trajectory
+            self.vector_x = random.uniform(round(self.speed), -round(self.speed))
+            self.vector_y = random.choice((-1, 1)) * math.sqrt(
+                self.speed ** 2 - self.vector_x ** 2
+            )
 
-# TODO add a game class
 
-
-class Player:
+class Player(DrawableRect):
     def __init__(self, coordinate, speed, width, height, color):
-        self.width = width
-        self.color = color
-        self.height = height
-        self.speed = speed  # how much the controller can move the ball
-        self.rect = pygame.Rect(coordinate[0], coordinate[1], width, height)
+        super().__init__(coordinate, width, height, color)
+        self.speed = speed  # baisically vector_y
 
-    def draw(self, surface):
-        pygame.draw.rect(surface, self.color, self.rect)
-
-    def get_rect(self):
-        return self.rect
-
-    def update_position(self, height):
+    def update_position(self, surface):
         # NOTE: alternative
         # event.type = pygame.KEYDOWN, event.key == pygame.KEY_DOWN -> set player movement, keyup -> player stops
         # holding key does not trigger an event
@@ -71,7 +84,7 @@ class Player:
         if keys[pygame.K_UP]:
             self.rect.top = max(self.rect.top - self.speed, 0)
         elif keys[pygame.K_DOWN]:
-            self.rect.bottom = min(height, self.rect.bottom + self.speed)
+            self.rect.bottom = min(surface.get_height(), self.rect.bottom + self.speed)
 
 
 class AIPlayer(Player):
@@ -79,11 +92,11 @@ class AIPlayer(Player):
         super().__init__(coordinate, speed, width, height, color)
         self.ball_rect = ball_rect
 
-    def update_position(self, height):
+    def update_position(self, surface):
         if self.rect.centery > self.ball_rect.centery:
             self.rect.top = max(self.rect.top - self.speed, 0)
         elif self.rect.centery < self.ball_rect.centery:
-            self.rect.bottom = min(height, self.rect.bottom + self.speed)
+            self.rect.bottom = min(surface.get_height(), self.rect.bottom + self.speed)
 
 
 # NOTE: how rect update all attributes with one function
@@ -162,8 +175,12 @@ while True:
             pygame.quit()
             sys.exit()
 
-    player.update_position(SCREEN_HEIGHT)
-    opponent.update_position(SCREEN_HEIGHT)
+    # update position of the drawables
+    player.update_position(SCREEN)
+    opponent.update_position(SCREEN)
+    ball.update_position(SCREEN)
+    ball.hit_players(player.get_rect(), opponent.get_rect())
+    ball.gg(SCREEN)
 
     # main display surface, only a single one
     # pygame.draw ==> directly on display
@@ -179,10 +196,7 @@ while True:
     # NOTE: draw takes a surface, color, rectangle
     player.draw(SCREEN)
     opponent.draw(SCREEN)
-    ball.update_position(SCREEN_WIDTH, SCREEN_HEIGHT)
-    ball.hit_players(player.get_rect(), opponent.get_rect())
     ball.draw(SCREEN)
-    # TODO check for collision, rect1.colliderect(rect2)
     pygame.draw.line(
         SCREEN,
         LIGHT_GREY,
