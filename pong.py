@@ -7,6 +7,7 @@ import pygame
 
 
 # TODO add a game class
+# TODO separate them to different classes
 class DrawableRect:
     def __init__(self, coordinate, width, height, color):
         self.color = color
@@ -23,47 +24,51 @@ class Ball(DrawableRect):
     def __init__(self, width, color, coordinate, initial_movement):
         super().__init__(coordinate, width, width, color)
         self.init_coordinate = coordinate
-        # use vector to denote speed and direction
-        self.vector_x, self.vector_y = initial_movement
-        self.speed = math.sqrt((self.vector_x) ** 2 + (self.vector_y) ** 2)
+        self.vector = initial_movement
 
     # draw ellipse instead of rect
     def draw(self, surface):
         pygame.draw.ellipse(surface, self.color, self.rect)
 
+    # players are not moving, their positions are fixed
     def update_position(self, surface, left_player, right_player):
-        screen_width = surface.get_width() - self.rect.width
-        screen_height = surface.get_height() - self.rect.width
+        # 1) calculate the position without colision
+        # 2) if there's collision, fix the trajectory
+        # 3) check again, if out of bound, BREAK
 
-        self.rect.x += self.vector_x
-        new_y = self.rect.y + self.vector_y
-        # if fractional, part of the ball follows the old trajectory
-        # the rest follows the new trajectory
-        # comment out so that left player can fight against the wall
-
-        if not surface.get_rect().contains(self.rect):
+        # 1)
+        # return a new rectangle with the new position
+        new_rect = self.rect.move(self.vector)
+        # 2)
+        # 2.1) y axis
+        surface_rect = surface.get_rect()
+        # python assignment doesn't return (unlike c/c++) if x=y vs if x==y
+        if surface_rect.top - new_rect.top > 0:
+            new_rect.move_ip(0, (surface_rect.top - new_rect.top) * 2)  # move down
+            self.vector.y *= -1
+        elif new_rect.bottom - surface_rect.bottom > 0:
+            new_rect.move_ip(0, -(new_rect.bottom - surface_rect.bottom) * 2)  # move up
+            self.vector.y *= -1
+        # 2.2) x axis
+        if new_rect.colliderect(left_player):
+            new_rect.move_ip((left_player.right - new_rect.left) * 2, 0)  # move right
+            self.vector.x *= -1
+        elif new_rect.colliderect(right_player):
+            new_rect.move_ip(-(new_rect.right - right_player.left) * 2, 0)  # move left
+            self.vector.x *= -1
+        # 3)
+        if not surface_rect.contains(new_rect):  # gg
             # reset the ball
             self.rect.x = self.init_coordinate[0]
             self.rect.y = self.init_coordinate[1]
             # random trajectory
             # TODO display trajectory
-            self.vector_x = random.uniform(round(self.speed), -round(self.speed))
-            self.vector_y = random.choice((-1, 1)) * math.sqrt(
-                self.speed ** 2 - self.vector_x ** 2
-            )
-            return
-
-        if self.rect.colliderect(left_player) or self.rect.colliderect(right_player):
-            self.vector_x *= -1
-
-        if new_y < 0:
-            self.rect.y = -new_y
-            self.vector_y *= -1
-        elif new_y > screen_height:
-            self.rect.y = screen_height - (new_y - screen_height)
-            self.vector_y *= -1
+            speed = self.vector.magnitude()
+            self.vector.x = random.uniform(round(speed), -round(speed))
+            self.vector.y = random.uniform(round(speed), -round(speed))
         else:
-            self.rect.y = new_y
+            # self.vector is already updated
+            self.rect = new_rect
 
 
 class Player(DrawableRect):
@@ -83,6 +88,7 @@ class Player(DrawableRect):
             self.rect.bottom = min(surface.get_height(), self.rect.bottom + self.speed)
 
 
+# TODO smarter AI that predicts the future
 class AIPlayer(Player):
     def update_position(self, surface, ball_rect):
         if self.rect.centery > ball_rect.centery:
@@ -90,28 +96,6 @@ class AIPlayer(Player):
         elif self.rect.centery < ball_rect.centery:
             self.rect.bottom = min(surface.get_height(), self.rect.bottom + self.speed)
 
-
-# NOTE: how rect update all attributes with one function
-class ShunRect:
-    def __init__(self, top, bottom):
-        self.top = top
-        self.bottom = bottom
-
-    # intercept attribute assignment
-    def __setattr__(self, key, value):
-        if key not in self.__dict__:
-            self.__dict__[key] = value  # constructor init
-        elif key == "top":
-            diff = value - self.__dict__["top"]
-            self.__dict__[key] = value
-            # assume there's bottom already
-            self.__dict__["bottom"] = self.__dict__["bottom"] + diff
-            # NOTE to avoid recursion self.top = value
-
-
-shunrect = ShunRect(100, 50)
-shunrect.top = 1000
-print(shunrect.bottom)
 
 # setup
 pygame.init()
@@ -132,7 +116,8 @@ ball = Ball(
     BALL_WIDTH,
     LIGHT_GREY,
     ((SCREEN_WIDTH - BALL_WIDTH) // 2, (SCREEN_HEIGHT - BALL_WIDTH) // 2),
-    (10, 5),  # TODO gets more difficult over time
+    pygame.math.Vector2(10, 5),  # TODO gets more difficult over time
+    # TODO winner use the mouse to control the destination
 )
 
 # (x,y,w,h)
