@@ -50,15 +50,19 @@ class Ball(DrawableRect):
             new_rect.move_ip(0, -(new_rect.bottom - surface_rect.bottom) * 2)  # move up
             self.vector.y *= -1
         # 2.2) x axis
-        if new_rect.colliderect(left_player):
-            new_rect.move_ip((left_player.right - new_rect.left) * 2, 0)  # move right
+        if new_rect.colliderect(left_player.get_rect()):
+            new_rect.move_ip(
+                (left_player.get_rect().right - new_rect.left) * 2, 0
+            )  # move right
             self.vector.x *= -1
-        elif new_rect.colliderect(right_player):
-            new_rect.move_ip(-(new_rect.right - right_player.left) * 2, 0)  # move left
+        elif new_rect.colliderect(right_player.get_rect()):
+            new_rect.move_ip(
+                -(new_rect.right - right_player.get_rect().left) * 2, 0
+            )  # move left
             self.vector.x *= -1
         # 3)
-        if not surface_rect.contains(new_rect):  # gg
-            # reset the ball
+        if not surface_rect.contains(new_rect):
+            # determine the loser (intersect left or right)
             self.rect.x = self.init_coordinate[0]
             self.rect.y = self.init_coordinate[1]
             # random trajectory
@@ -66,6 +70,10 @@ class Ball(DrawableRect):
             speed = self.vector.magnitude()
             self.vector.x = random.uniform(round(speed), -round(speed))
             self.vector.y = random.uniform(round(speed), -round(speed))
+            if not surface_rect.collidepoint(new_rect.midleft):
+                return left_player
+            else:
+                return right_player
         else:
             # self.vector is already updated
             self.rect = new_rect
@@ -75,6 +83,7 @@ class Player(DrawableRect):
     def __init__(self, coordinate, speed, width, height, color):
         super().__init__(coordinate, width, height, color)
         self.speed = speed  # baisically vector_y
+        self.score = 0  # each player has a score
 
     def update_position(self, surface):
         # NOTE: alternative
@@ -86,6 +95,9 @@ class Player(DrawableRect):
             self.rect.top = max(self.rect.top - self.speed, 0)
         elif keys[pygame.K_DOWN]:
             self.rect.bottom = min(surface.get_height(), self.rect.bottom + self.speed)
+
+    def update_score(self):
+        self.score += 1
 
 
 # TODO smarter AI that predicts the future
@@ -155,7 +167,12 @@ while True:
     # update position of the drawables
     player.update_position(SCREEN)
     opponent.update_position(SCREEN, ball.get_rect())
-    ball.update_position(SCREEN, player.get_rect(), opponent.get_rect())
+    loser = ball.update_position(SCREEN, player, opponent)
+    if loser is not None:
+        if player is not loser:
+            player.update_score()
+        else:
+            opponent.update_score()
 
     # main display surface, only a single one
     # pygame.draw ==> directly on display
@@ -179,6 +196,9 @@ while True:
         (SCREEN_WIDTH // 2, SCREEN_HEIGHT),
         2,
     )
+    # draw both scores:
+    game_font = pygame.font.Font("freesansbold.ttf", 100)
+    SCREEN.blit(game_font.render(f"{player.score}", True, LIGHT_GREY), (660, 470))
     pygame.display.flip()
     # limits how fast the loop runs, 60fps
     # NOTE: computer do the while loop as fast as possible
