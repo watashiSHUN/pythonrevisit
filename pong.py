@@ -31,6 +31,7 @@ class Ball(DrawableRect):
         pygame.draw.ellipse(surface, self.color, self.rect)
 
     # players are not moving, their positions are fixed
+    # return None or game winner
     def update_position(self, surface, left_player, right_player):
         # 1) calculate the position without colision
         # 2) if there's collision, fix the trajectory
@@ -67,13 +68,16 @@ class Ball(DrawableRect):
             self.rect.y = self.init_coordinate[1]
             # random trajectory
             # TODO display trajectory
-            speed = self.vector.magnitude()
-            self.vector.x = random.uniform(round(speed), -round(speed))
-            self.vector.y = random.uniform(round(speed), -round(speed))
-            if not surface_rect.collidepoint(new_rect.midleft):
-                return left_player
-            else:
-                return right_player
+            while True:
+                self.vector.rotate_ip(random.uniform(0, 360))
+                if abs(self.vector.x) > 2:
+                    break
+            print(self.vector.x, self.vector.y)
+            return (
+                right_player
+                if not surface_rect.collidepoint(new_rect.midleft)
+                else left_player
+            )
         else:
             # self.vector is already updated
             self.rect = new_rect
@@ -99,6 +103,24 @@ class Player(DrawableRect):
     def update_score(self):
         self.score += 1
 
+    # override
+    def draw(self, surface):
+        # create font objects
+        font = pygame.font.Font("freesansbold.ttf", 500)
+        # NOTE create a txt surface
+        font_surface = font.render(f"{self.score}", True, SUPER_LIGHT_GREY)
+        font_rect = font_surface.get_rect()
+        font_rect.center = (
+            surface.get_width()
+            * (1 if self.rect.x < surface.get_width() // 2 else 3)
+            // 4,
+            surface.get_height() // 2,
+        )
+        # put a surface onto another, blit
+        SCREEN.blit(font_surface, font_rect)
+        # call parent
+        super().draw(surface)
+
 
 # TODO smarter AI that predicts the future
 class AIPlayer(Player):
@@ -117,6 +139,7 @@ SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 960
 BACKGROUND = pygame.Color("grey12")
 LIGHT_GREY = (200, 200, 200)
+SUPER_LIGHT_GREY = (50, 50, 50)
 SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Pong")
 
@@ -167,12 +190,11 @@ while True:
     # update position of the drawables
     player.update_position(SCREEN)
     opponent.update_position(SCREEN, ball.get_rect())
-    loser = ball.update_position(SCREEN, player, opponent)
-    if loser is not None:
-        if player is not loser:
-            player.update_score()
-        else:
-            opponent.update_score()
+    winner = ball.update_position(SCREEN, player, opponent)
+    if winner is player:
+        player.update_score()
+    if winner is opponent:
+        opponent.update_score()
 
     # main display surface, only a single one
     # pygame.draw ==> directly on display
@@ -196,9 +218,6 @@ while True:
         (SCREEN_WIDTH // 2, SCREEN_HEIGHT),
         2,
     )
-    # draw both scores:
-    game_font = pygame.font.Font("freesansbold.ttf", 100)
-    SCREEN.blit(game_font.render(f"{player.score}", True, LIGHT_GREY), (660, 470))
     pygame.display.flip()
     # limits how fast the loop runs, 60fps
     # NOTE: computer do the while loop as fast as possible
