@@ -2,6 +2,7 @@
 import math
 import random
 import sys
+import time
 
 import pygame
 
@@ -33,6 +34,10 @@ class Ball(DrawableRect):
     # players are not moving, their positions are fixed
     # return None or game winner
     def update_position(self, surface, left_player, right_player):
+        # update the position if current_time > start_time or start_time is None
+        start_time = self.__dict__.get("start_time", None)
+        if start_time is not None and time.time() < start_time:
+            return
         # 1) calculate the position without colision
         # 2) if there's collision, fix the trajectory
         # 3) check again, if out of bound, BREAK
@@ -66,13 +71,15 @@ class Ball(DrawableRect):
             # determine the loser (intersect left or right)
             self.rect.x = self.init_coordinate[0]
             self.rect.y = self.init_coordinate[1]
+            # time.time() return in seconds
+            # pygame.time.get_ticks() return ms, since pygame.init()
+            self.start_time = time.time() + 3
             # random trajectory
             # TODO display trajectory
             while True:
                 self.vector.rotate_ip(random.uniform(0, 360))
                 if abs(self.vector.x) > 2:
                     break
-            print(self.vector.x, self.vector.y)
             return (
                 right_player
                 if not surface_rect.collidepoint(new_rect.midleft)
